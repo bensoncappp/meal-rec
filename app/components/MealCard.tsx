@@ -1,4 +1,6 @@
+import { useState } from "react";
 import styles from "./MealCard.module.css";
+import { TEMP_USER_ID } from "@/lib/constants";
 
 type Ingredient = {
   food: string;
@@ -14,6 +16,22 @@ type MealCardProps = {
 };
 
 export default function MealCard({ ingredients, totals }: MealCardProps) {
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+
+    const res = await fetch("/api/meals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: TEMP_USER_ID, ingredients, totals }),
+    });
+
+    if (res.ok) setSaved(true);
+    setSaving(false);
+  }
+
   return (
     <div className={styles.card}>
       <div className={styles.header}>
@@ -26,6 +44,7 @@ export default function MealCard({ ingredients, totals }: MealCardProps) {
           <span>C {Math.round(totals.carbs)}g</span>
         </div>
       </div>
+
       <ul className={styles.list}>
         {ingredients.map((item) => (
           <li key={item.food} className={styles.item}>
@@ -34,7 +53,14 @@ export default function MealCard({ ingredients, totals }: MealCardProps) {
           </li>
         ))}
       </ul>
-      <button className={styles.saveButton}>Save meal</button>
+
+      <button
+        className={styles.saveButton}
+        onClick={handleSave}
+        disabled={saving || saved}
+      >
+        {saved ? "Saved ✓" : saving ? "Saving…" : "Save meal"}
+      </button>
     </div>
   );
 }
