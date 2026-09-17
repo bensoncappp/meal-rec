@@ -1,10 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import MealCard from "./components/MealCard";
+import styles from "./page.module.css";
+
+type Ingredient = {
+  food: string;
+  grams: number;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+};
+type MealResult = {
+  meal: Ingredient[];
+  totals: { calories: number; protein: number; fat: number; carbs: number };
+};
 
 export default function Home() {
   const [calorieTarget, setCalorieTarget] = useState(600);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<MealResult | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleGenerate() {
@@ -14,12 +29,7 @@ export default function Home() {
     const res = await fetch("/api/generate-meal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        calorieTarget,
-        protein: 30,
-        fat: 25,
-        carbs: 45,
-      }),
+      body: JSON.stringify({ calorieTarget, protein: 30, fat: 25, carbs: 45 }),
     });
 
     const data = await res.json();
@@ -28,23 +38,31 @@ export default function Home() {
   }
 
   return (
-    <main style={{ padding: 40 }}>
-      <h1>Meal Prep Generator — Test</h1>
+    <div>
+      <div className={styles.controls}>
+        <label className={styles.label}>
+          Calorie target
+          <input
+            type="number"
+            value={calorieTarget}
+            onChange={(e) => setCalorieTarget(Number(e.target.value))}
+            className={styles.input}
+          />
+        </label>
+        <button
+          className={styles.generateButton}
+          onClick={handleGenerate}
+          disabled={loading}
+        >
+          {loading ? "Generating…" : "Generate meal"}
+        </button>
+      </div>
 
-      <input
-        type="number"
-        value={calorieTarget}
-        onChange={(e) => setCalorieTarget(Number(e.target.value))}
-      />
-      <button onClick={handleGenerate} disabled={loading}>
-        {loading ? "Generating..." : "Generate Meal"}
-      </button>
-
-      {result && (
-        <pre style={{ marginTop: 20, background: "#f4f4f4", padding: 16 }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
-      )}
-    </main>
+      <div className={styles.grid}>
+        {result && (
+          <MealCard ingredients={result.meal} totals={result.totals} />
+        )}
+      </div>
+    </div>
   );
 }

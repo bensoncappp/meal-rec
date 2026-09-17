@@ -1,0 +1,65 @@
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 280px;
+}
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.calories {
+  font-size: 22px;
+  font-weight: 700;
+}
+.macros {
+  display: flex;
+  gap: 10px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+}
+.item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.foodName {
+  text-transform: capitalize;
+}
+.grams {
+  color: var(--color-text-muted);
+}
+.saveButton {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--color-accent);
+}
+.saveButton:hover {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}

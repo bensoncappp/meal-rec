@@ -4,15 +4,30 @@ import { NextResponse } from "next/server";
 // This creates one "client" object, authenticated with your API key. basically just another layer of abstraction
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-const SYSTEM_PROMPT = `You are a meal-planning assistant. Given a calorie target and macro split, suggest realistic food combinations for a single meal.
+const SYSTEM_PROMPT = `You are a meal-planning assistant. Given a calorie target and macro split, generate a full meal.
 
 Rules:
-- Only suggest whole, generic ingredients — never branded or packaged products.
-- Each ingredient name MUST be qualified with its preparation state (e.g. "raw", "uncooked", "boneless, skinless") so it can be looked up accurately in a nutrition database.
-- Do NOT calculate or output any gram amounts, calories, or macros yourself — that will be handled separately.
+- Suggest whole, generic, realistic foods (no branded products).
+- For each food, estimate a realistic portion size in grams, and its calories, protein, fat, and carbs for that portion — based on typical nutritional values.
+- The total across all foods should roughly hit the calorie and macro target given.
 - Return ONLY valid JSON, no other text, in this exact shape:
 {
-  "ingredients": ["ingredient name 1", "ingredient name 2", "ingredient name 3"]
+  "meal": [
+    {
+      "food": "boneless, skinless chicken breast, raw",
+      "grams": 150,
+      "calories": 165,
+      "protein": 31,
+      "fat": 3.6,
+      "carbs": 0
+    }
+  ],
+  "totals": {
+    "calories": 600,
+    "protein": 45,
+    "fat": 15,
+    "carbs": 60
+  }
 }`;
 
 //conventiaonl set style to write like this
