@@ -1,6 +1,9 @@
+"use client";
+
 import { useState } from "react";
 import styles from "./MealCard.module.css";
 import { TEMP_USER_ID } from "@/lib/constants";
+import MealDetailModal from "./MealDetailModal";
 
 type Ingredient = {
   food: string;
@@ -10,22 +13,33 @@ type Ingredient = {
   fat: number;
   carbs: number;
 };
-type MealCardProps = {
-  ingredients: Ingredient[];
+type Meal = {
+  cuisine?: string;
+  items: Ingredient[];
   totals: { calories: number; protein: number; fat: number; carbs: number };
+  imageUrl: string;
 };
 
-export default function MealCard({ ingredients, totals }: MealCardProps) {
+export default function MealCard({ meal }: { meal: Meal }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  async function handleSave() {
+  const previewItems = meal.items.slice(0, 4);
+  const hasMore = meal.items.length > 4;
+
+  async function handleSave(e: React.MouseEvent) {
+    e.stopPropagation(); // don't also trigger the card's expand click
     setSaving(true);
 
     const res = await fetch("/api/meals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: TEMP_USER_ID, ingredients, totals }),
+      body: JSON.stringify({
+        userId: TEMP_USER_ID,
+        ingredients: meal.items,
+        totals: meal.totals,
+      }),
     });
 
     if (res.ok) setSaved(true);
@@ -33,34 +47,54 @@ export default function MealCard({ ingredients, totals }: MealCardProps) {
   }
 
   return (
-    <div className={styles.card}>
-      <div className={styles.header}>
-        <span className={styles.calories}>
-          {Math.round(totals.calories)} kcal
-        </span>
-        <div className={styles.macros}>
-          <span>P {Math.round(totals.protein)}g</span>
-          <span>F {Math.round(totals.fat)}g</span>
-          <span>C {Math.round(totals.carbs)}g</span>
+    <>
+      <div className={styles.card} onClick={() => setExpanded(true)}>
+        <div className={styles.left}>
+          <div className={styles.header}>
+            <span className={styles.calories}>
+              {Math.round(meal.totals.calories)} kcal
+            </span>
+            <div className={styles.macros}>
+              <span>P {Math.round(meal.totals.protein)}g</span>
+              <span>F {Math.round(meal.totals.fat)}g</span>
+              <span>C {Math.round(meal.totals.carbs)}g</span>
+            </div>
+          </div>
+
+          <ul className={styles.list}>
+            {previewItems.map((item) => (
+              <li key={item.food} className={styles.item}>
+                {item.food}
+              </li>
+            ))}
+            {hasMore && <li className={styles.more}>...</li>}
+          </ul>
+        </div>
+
+        <div className={styles.imageWrap}>
+          <img
+            src={meal.imageUrl}
+            alt={meal.cuisine ?? "Meal"}
+            className={styles.image}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/placeholder-meal.png"; // add a simple placeholder image to /public
+            }}
+          />
+          <button
+            className={styles.saveIcon}
+            onClick={handleSave}
+            disabled={saving || saved}
+            title="Save meal"
+          >
+            {saved ? "✓" : "🔖"}
+          </button>
         </div>
       </div>
 
-      <ul className={styles.list}>
-        {ingredients.map((item) => (
-          <li key={item.food} className={styles.item}>
-            <span className={styles.foodName}>{item.food}</span>
-            <span className={styles.grams}>{item.grams}g</span>
-          </li>
-        ))}
-      </ul>
-
-      <button
-        className={styles.saveButton}
-        onClick={handleSave}
-        disabled={saving || saved}
-      >
-        {saved ? "Saved ✓" : saving ? "Saving…" : "Save meal"}
-      </button>
-    </div>
+      {expanded && (
+        <MealDetailModal meal={meal} onClose={() => setExpanded(false)} />
+      )}
+    </>
   );
 }
