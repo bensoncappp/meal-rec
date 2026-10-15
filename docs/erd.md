@@ -32,6 +32,7 @@ erDiagram
         numeric protein
         numeric fat
         numeric carbs
+        text image_url
     }
 
     BOARDS {

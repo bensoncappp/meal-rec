@@ -50,3 +50,17 @@
   overflow-y: auto;
   padding-right: 8px;
 }
+
+.searchInput {
+  flex: 1;
+  max-width: 480px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 11px 18px;
+  font-size: 14px;
+  background: var(--color-surface);
+}
+.searchInput:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

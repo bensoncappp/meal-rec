@@ -39,6 +39,8 @@ export default function MealCard({ meal }: { meal: Meal }) {
         userId: TEMP_USER_ID,
         ingredients: meal.items,
         totals: meal.totals,
+        imageUrl: meal.imageUrl,
+
       }),
     });
 

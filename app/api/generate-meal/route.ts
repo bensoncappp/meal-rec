@@ -39,6 +39,17 @@ const CLOCK_POSITIONS: Record<number, string[]> = {
   4: ["at 12 o'clock", "at 3 o'clock", "at 6 o'clock", "at 9 o'clock"],
 };
 
+// Strips database-style qualifiers that mean nothing visually (nutrition states, percentages,
+// parenthetical notes) so the image model gets a clean, natural food description instead of
+// raw nutrition-label text like "Pasta, Dry" or "Lean Ground Beef (90% Lean)".
+function sanitizeForImagePrompt(foodName: string): string {
+  return foodName
+    .replace(/\([^)]*\)/g, "") // remove anything in parentheses, e.g. "(90% Lean)"
+    .replace(/,?\s*(dry weight|dry|raw|canned|uncooked)\b/gi, "") // remove state words that don't describe the cooked dish
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 // Filters a meal's ingredients down to only what should actually be drawn on the plate —
 // oils/vinegars are invisible in a photo, sauces get folded into a descriptor instead of shown as a separate item,
 // and anything under 15g is too small to render meaningfully.
@@ -54,17 +65,19 @@ function pickVisibleIngredients(items: { food: string; grams: number }[]) {
       name.includes("dressing") ||
       name.includes("glaze")
     ) {
-      sauceDescriptor = `lightly glazed with ${item.food}`;
+      sauceDescriptor = `lightly glazed with ${sanitizeForImagePrompt(item.food)}`;
       continue;
     }
     if (item.grams < 15) continue;
-    visible.push(item.food);
+    visible.push(sanitizeForImagePrompt(item.food));
   }
 
   return { visible, sauceDescriptor };
 }
 
 // Builds the actual text prompt sent to the image model, based on one meal's visible ingredients.
+// Explicitly says the foods are DIFFERENT, because a vague "separate portions" tends to produce
+// N identical servings of one dish (stock-photo grid pattern) instead of N distinct foods.
 function buildImagePrompt(items: { food: string; grams: number }[]) {
   const { visible, sauceDescriptor } = pickVisibleIngredients(items);
   const count = Math.min(visible.length, 4) || 1;
@@ -77,7 +90,7 @@ function buildImagePrompt(items: { food: string; grams: number }[]) {
 
   const sauceText = sauceDescriptor ? `, ${sauceDescriptor}` : "";
 
-  return `Food photography, high 45-degree angle, one white circular plate with separate portions: ${layout}${sauceText}. Natural matte texture, visible grill char marks where relevant, shot on DSLR, soft diffused daylight, shallow depth of field, realistic, appetizing, plain background, no extra garnish, no text, no utensils`;
+  return `Food photography, high 45-degree angle, one single plate showing ${count} DIFFERENT foods side by side (not ${count} servings of the same food): ${layout}${sauceText}. Each food item is visually distinct from the others in shape, color and texture. Natural matte texture, visible grill char marks where relevant, shot on DSLR, soft diffused daylight, shallow depth of field, realistic, appetizing, plain background, no extra garnish, no text, no utensils`;
 }
 
 // Turns a text prompt into a real Pollinations image URL. No API key needed — the URL itself IS the generated image;
