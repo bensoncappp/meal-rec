@@ -1,4 +1,5 @@
 import styles from "./MealCard.module.css";
+import AddToBoardButton from "./AddToBoardButton";
 
 type MealItem = { food_name: string; grams: number };
 type Meal = {
@@ -9,9 +10,18 @@ type Meal = {
   carbs: number;
   image_url: string | null;
   meal_items: MealItem[];
+  board_meals?: { board_id: string }[];
 };
 
-export default function SavedMealCard({ meal }: { meal: Meal }) {
+export default function SavedMealCard({
+  meal,
+  boards,
+}: {
+  meal: Meal;
+  boards?: { id: string; name: string }[];
+}) {
+  const memberOf = (meal.board_meals ?? []).map((bm) => bm.board_id);
+
   return (
     <div className={styles.card}>
       <div className={styles.left}>
@@ -29,6 +39,10 @@ export default function SavedMealCard({ meal }: { meal: Meal }) {
             <li key={i} className={styles.item}>{item.food_name}</li>
           ))}
         </ul>
+
+        {boards && (
+          <AddToBoardButton mealId={meal.id} boards={boards} memberOf={memberOf} />
+        )}
       </div>
 
       {meal.image_url && (

@@ -1,0 +1,89 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal {
+  background: var(--color-surface);
+  border-radius: 16px;
+  padding: 24px;
+  width: 400px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.title { margin: 0; text-align: center; font-size: 20px; }
+.search {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+.list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 80px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+.row:hover { background: var(--color-bg); }
+.boardName { font-weight: 700; font-size: 15px; }
+.addBtn {
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.addBtn:disabled { opacity: 0.6; cursor: default; }
+.addedLabel { color: var(--color-text-muted); font-size: 13px; font-weight: 700; }
+.empty { color: var(--color-text-muted); font-size: 14px; padding: 8px 12px; }
+.footer { border-top: 1px solid var(--color-border); padding-top: 12px; }
+.createRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.createRow:hover { background: var(--color-bg); }
+.plus {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+.createForm { display: flex; gap: 8px; }
+.createInput {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+.error { color: #b3261e; font-size: 13px; margin: 0; }

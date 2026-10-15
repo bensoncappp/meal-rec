@@ -6,7 +6,14 @@ import styles from "../page.module.css";
 export default async function SavedMealsPage() {
   const { data: meals, error } = await supabase
     .from("meals")
-    .select("*, meal_items(*)")
+    .select("*, meal_items(*), board_meals(board_id)")
+    .eq("user_id", TEMP_USER_ID)
+    .order("created_at", { ascending: false });
+
+  // The user's boards, so each card's modal can list them.
+  const { data: boards } = await supabase
+    .from("boards")
+    .select("id, name")
     .eq("user_id", TEMP_USER_ID)
     .order("created_at", { ascending: false });
 
@@ -23,7 +30,7 @@ export default async function SavedMealsPage() {
   return (
     <div className={styles.grid}>
       {meals.map((meal) => (
-        <SavedMealCard key={meal.id} meal={meal} />
+        <SavedMealCard key={meal.id} meal={meal} boards={boards ?? []} />
       ))}
     </div>
   );
