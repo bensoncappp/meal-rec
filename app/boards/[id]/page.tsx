@@ -27,27 +27,27 @@ export default async function BoardDetailPage({
     .filter(Boolean);
   const totals = sumMacros(meals);
 
-  return (
+    return (
     <div>
-      <Link href="/boards" className={styles.backLink}>← All boards</Link>
-      <h1>{board.name}</h1>
+        <Link href="/boards" className={styles.backLink}>← All boards</Link>
+        <h1 className={styles.pageTitle}>{board.name}</h1>
 
-      <div className={styles.summary}>
-        <span>{Math.round(totals.calories)} kcal</span>
-        <span>P {Math.round(totals.protein)}g</span>
-        <span>F {Math.round(totals.fat)}g</span>
-        <span>C {Math.round(totals.carbs)}g</span>
-      </div>
-
-      {meals.length === 0 ? (
-        <p>No meals in this board yet.</p>
-      ) : (
-        <div className={pageStyles.grid}>
-          {meals.map((meal: any) => (
-            <SavedMealCard key={meal.id} meal={meal} />
-          ))}
+        <div className={styles.summary}>
+        <span className={styles.tag}>{Math.round(totals.calories)} kcal</span>
+        <span className={styles.tag}>P {Math.round(totals.protein)}g</span>
+        <span className={styles.tag}>F {Math.round(totals.fat)}g</span>
+        <span className={styles.tag}>C {Math.round(totals.carbs)}g</span>
         </div>
-      )}
+
+        {meals.length === 0 ? (
+        <p>No meals in this board yet.</p>
+        ) : (
+        <div className={pageStyles.grid}>
+            {meals.map((meal: any) => (
+            <SavedMealCard key={meal.id} meal={meal} />
+            ))}
+        </div>
+        )}
     </div>
-  );
+    );
 }

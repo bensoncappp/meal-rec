@@ -4,24 +4,32 @@ import { NextResponse } from "next/server";
 // This creates one "client" object, authenticated with your API key. basically just another layer of abstraction
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
+// Dev/cost switch from .env.local. Image generation is OFF unless explicitly set to "true",
+// which keeps the main meal flow fast and free of image-provider failures while testing.
+const IMAGES_ENABLED = process.env.ENABLE_IMAGE_GENERATION === "true";
+
+
 const SYSTEM_PROMPT = `You are an expert chef and meal-prep planner. Given a calorie target and macro split, generate exactly 3 distinct full meals.
 
 Rules:
-- Each meal's ingredients MUST make culinary sense together — build each meal around a real, recognizable cuisine style (e.g. Japanese, Korean, Italian, Mexican, Indian, Mediterranean, Western). Do not just combine foods to hit macros; they must belong together as a dish a person would actually recognize and want to eat.
-- Vary the cuisine style across the 3 meals so the user gets real variety, not 3 versions of the same thing.
+- Every meal must be a REAL, existing dish from a specific cuisine that people already know and order (e.g. Chicken Teriyaki Rice Bowl, Butter Chicken with Basmati Rice, Bibimbap, Chicken Burrito Bowl, Greek Chicken Gyro Plate, Grilled Salmon with Roasted Vegetables). Start from the authentic dish, then SIMPLIFY it — fewer ingredients, lean proteins, lighter cooking methods, sensible portions — so it fits the calorie and macro target. Never invent a dish by just combining foods to hit macros.
+- Every ingredient must belong in that dish. Use the ingredients, sauces and seasonings the dish is actually known for (e.g. teriyaki sauce in a teriyaki bowl, not olive oil and salsa). No random extras. Use 4 to 7 ingredients per meal.
+- Vary the cuisine across the 3 meals (e.g. one Asian, one Western, one Indian or Mexican) so the user gets real variety. If the user asks for one cuisine, give 3 different dishes from that cuisine.
+- "name": a short, appetizing dish name of 2 to 5 words, with no calorie numbers and no quotes (e.g. "Teriyaki Chicken Rice Bowl").
+- "cuisine": the single cuisine the dish comes from (e.g. "Japanese").
 - Only suggest whole, generic, realistic foods (no branded products).
-- If a sauce, dressing, or oil is used, include it as its own ingredient with estimated macros, but keep quantities realistic.
-- For each food, estimate a realistic portion size in grams and its calories, protein, fat, and carbs for that portion, based on typical nutritional values.
-- Each meal's totals should roughly hit the calorie and macro target given.
+- If a sauce, dressing, or oil is used, include it as its own ingredient with realistic quantities and its own macros.
+- For each food, estimate a realistic portion size in grams and its calories, protein, fat, and carbs for that portion, based on typical nutritional values. Keep each food's calories consistent with its macros (about 4 per gram of protein, 4 per gram of carbs, 9 per gram of fat).
+- The sum of the foods should roughly hit the calorie and macro target given.
 - Return ONLY valid JSON, no other text, in this exact shape:
 {
   "meals": [
     {
+      "name": "Teriyaki Chicken Rice Bowl",
       "cuisine": "Japanese",
       "items": [
         { "food": "ingredient name", "grams": 000, "calories": 000, "protein": 00, "fat": 00, "carbs": 00 }
-      ],
-      "totals": { "calories": 000, "protein": 00, "fat": 00, "carbs": 00 }
+      ]
     }
   ]
 }`;
@@ -170,11 +178,30 @@ export async function POST(req: Request) {
     );
   }
 
-  // For each of Gemini's 3 meals, generate a matching plate image URL from its own ingredient list.
-  const meals = (parsed.meals ?? []).map((meal: any) => ({
-    ...meal,
-    imageUrl: buildImageUrl(buildImagePrompt(meal.items)),
-  }));
+  // For each of Gemini's 3 meals, generate a matching plate image URL from its own ingredient list
+  // (only when the toggle is on; otherwise imageUrl is null and the UI shows the placeholder).
+    // Totals are summed from the ingredient list here in code, not trusted from the AI,
+  // so a meal's headline numbers always match the ingredients shown under it.
+  // For each of Gemini's 3 meals, also generate a matching plate image URL
+  // (only when the toggle is on; otherwise imageUrl is null and the UI shows the placeholder).
+  const meals = (parsed.meals ?? []).map((meal: any) => {
+    const totals = (meal.items ?? []).reduce(
+      (t: any, i: any) => ({
+        calories: t.calories + Number(i.calories ?? 0),
+        protein: t.protein + Number(i.protein ?? 0),
+        fat: t.fat + Number(i.fat ?? 0),
+        carbs: t.carbs + Number(i.carbs ?? 0),
+      }),
+      { calories: 0, protein: 0, fat: 0, carbs: 0 },
+    );
+    return {
+      ...meal,
+      totals,
+      imageUrl: IMAGES_ENABLED
+        ? buildImageUrl(buildImagePrompt(meal.items))
+        : null,
+    };
+  });
 
   return NextResponse.json({ meals });
 }

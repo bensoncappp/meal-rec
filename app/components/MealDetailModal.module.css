@@ -1,57 +1,127 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(34, 58, 45, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
+  padding: 24px;
+}
+
+.wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  max-height: 90vh;
 }
 
 .modal {
-  background: var(--color-surface);
-  border-radius: 16px;
-  padding: 32px;
-  width: 420px;
-  max-height: 80vh;
-  overflow-y: auto;
   position: relative;
+  display: flex;
+  gap: 32px;
+  background: #e6e0d2;
+  border-radius: 28px;
+  padding: 36px;
+  width: min(860px, 80vw);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .closeButton {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 14px;
+  right: 18px;
   background: none;
   border: none;
   font-size: 18px;
   cursor: pointer;
+  color: var(--color-text);
 }
-.image {
-  width: 100%;
-  border-radius: 12px;
-  margin-bottom: 16px;
+
+.left {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-size: 28px;
+}
+.calories {
+  margin: 8px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.cuisine {
+  margin: 10px 0 0;
+  font-style: italic;
+  font-size: 14px;
 }
 .macros {
   display: flex;
-  gap: 16px;
-  color: var(--color-text-muted);
-  margin-bottom: 16px;
+  gap: 10px;
+  margin: 12px 0 28px;
+  font-style: italic;
+  font-size: 14px;
 }
 
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 .item {
   display: flex;
   justify-content: space-between;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 8px;
-  font-size: 14px;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-text);
+  font-size: 15px;
+}
+.item:last-child {
+  border-bottom: none;
+}
+.food {
   text-transform: capitalize;
+}
+
+.imageBox {
+  flex: 0 0 320px;
+  align-self: flex-start;
+}
+.image,
+.placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.placeholder {
+  background: #f7ecea;
+}
+
+.saveButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding-top: 24px;
+}
+.saveButton:disabled {
+  cursor: default;
+}
+
+@media (max-width: 800px) {
+  .modal {
+    flex-direction: column-reverse;
+  }
+  .imageBox {
+    flex-basis: auto;
+  }
 }

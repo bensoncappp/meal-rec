@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { TEMP_USER_ID } from "@/lib/constants";
 import SavedMealCard from "../components/SavedMealCard";
 import styles from "../page.module.css";
+import boardStyles from "../components/Boards.module.css";
 
 export default async function SavedMealsPage() {
   const { data: meals, error } = await supabase
@@ -28,10 +29,13 @@ export default async function SavedMealsPage() {
   }
 
   return (
-    <div className={styles.grid}>
-      {meals.map((meal) => (
-        <SavedMealCard key={meal.id} meal={meal} boards={boards ?? []} />
-      ))}
+    <div>
+      <h1 className={boardStyles.pageTitle}>Saved Meals</h1>
+      <div className={styles.grid}>
+        {meals.map((meal) => (
+          <SavedMealCard key={meal.id} meal={meal} boards={boards ?? []} />
+        ))}
+      </div>
     </div>
   );
 }

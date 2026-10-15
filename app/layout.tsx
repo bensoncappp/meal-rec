@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { Inter, Lobster } from "next/font/google";
 import "./globals.css";
 import styles from "./layout.module.css";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
+import { Suspense } from "react";
 
-const manrope = Manrope({ subsets: ["latin"], weight: ["500", "700"] });
+
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const lobster = Lobster({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-logo",
+});
 
 export const metadata: Metadata = {
   title: "Meal Prep Generator",
@@ -19,11 +26,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={manrope.className}>
+      <body className={`${inter.className} ${lobster.variable}`}>
         <div className={styles.shell}>
           <Sidebar />
           <div className={styles.main}>
-            <TopBar />
+            <Suspense fallback={null}>
+              <TopBar />
+            </Suspense>
             <div className={styles.content}>{children}</div>
           </div>
         </div>

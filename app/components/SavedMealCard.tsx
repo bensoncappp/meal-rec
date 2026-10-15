@@ -1,9 +1,14 @@
+"use client";
+
+import { useState } from "react";
 import styles from "./MealCard.module.css";
 import AddToBoardButton from "./AddToBoardButton";
+import MealDetailModal from "./MealDetailModal";
 
 type MealItem = { food_name: string; grams: number };
 type Meal = {
   id: string;
+  name: string | null;
   calories: number;
   protein: number;
   fat: number;
@@ -20,36 +25,135 @@ export default function SavedMealCard({
   meal: Meal;
   boards?: { id: string; name: string }[];
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [name, setName] = useState<string>(meal.name ?? "");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
   const memberOf = (meal.board_meals ?? []).map((bm) => bm.board_id);
 
+  async function saveName() {
+    const next = draft.trim();
+    setEditing(false);
+    if (!next || next === name) return; // empty or unchanged: keep the old name
+    const res = await fetch(`/api/meals/${meal.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: next }),
+    });
+    if (res.ok) setName(next);
+  }
+
   return (
-    <div className={styles.card}>
-      <div className={styles.left}>
-        <div className={styles.header}>
-          <span className={styles.calories}>{Math.round(meal.calories)} kcal</span>
-          <div className={styles.macros}>
-            <span>P {Math.round(meal.protein)}g</span>
-            <span>F {Math.round(meal.fat)}g</span>
-            <span>C {Math.round(meal.carbs)}g</span>
+    <>
+      <div className={styles.card} onClick={() => setExpanded(true)}>
+        <div className={styles.left}>
+          <div>
+            {/* stopPropagation: editing the name shouldn't open the detail view */}
+            <div className={styles.titleRow} onClick={(e) => e.stopPropagation()}>
+              {editing ? (
+                <input
+                  autoFocus
+                  className={styles.titleInput}
+                  value={draft}
+                  maxLength={80}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={saveName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveName();
+                    if (e.key === "Escape") setEditing(false);
+                  }}
+                />
+              ) : (
+                <>
+                  <span
+                    className={`${styles.title} ${name ? "" : styles.untitled}`}
+                  >
+                    {name || "Untitled meal"}
+                  </span>
+                  <button
+                    className={styles.editBtn}
+                    aria-label="Rename meal"
+                    onClick={() => {
+                      setDraft(name);
+                      setEditing(true);
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
+            <div className={styles.calories}>
+              {Math.round(meal.calories)} kcal
+            </div>
+            <div className={styles.macros}>
+              <span>P {Math.round(meal.protein)}g</span>
+              <span>F {Math.round(meal.fat)}g</span>
+              <span>C {Math.round(meal.carbs)}g</span>
+            </div>
           </div>
+
+          <ul className={styles.list}>
+            {meal.meal_items.slice(0, 4).map((item, i) => (
+              <li key={i} className={styles.item}>
+                {item.food_name}
+              </li>
+            ))}
+            {meal.meal_items.length > 4 && <li className={styles.more}>...</li>}
+          </ul>
+
+          {boards && (
+            // stopPropagation: clicking "Add to board" shouldn't also open the detail view
+            <div onClick={(e) => e.stopPropagation()}>
+              <AddToBoardButton
+                mealId={meal.id}
+                boards={boards}
+                memberOf={memberOf}
+              />
+            </div>
+          )}
         </div>
 
-        <ul className={styles.list}>
-          {meal.meal_items.map((item, i) => (
-            <li key={i} className={styles.item}>{item.food_name}</li>
-          ))}
-        </ul>
-
-        {boards && (
-          <AddToBoardButton mealId={meal.id} boards={boards} memberOf={memberOf} />
-        )}
+        <div className={styles.imagePanel}>
+          {meal.image_url ? (
+            <img src={meal.image_url} alt={name || "Saved meal"} className={styles.image} />
+          ) : (
+            <div className={styles.placeholder} />
+          )}
+        </div>
       </div>
 
-      {meal.image_url && (
-        <div className={styles.imageWrap}>
-          <img src={meal.image_url} alt="Saved meal" className={styles.image} />
-        </div>
+      {expanded && (
+        <MealDetailModal
+          meal={{
+            name,
+            items: meal.meal_items.map((i) => ({
+              food: i.food_name,
+              grams: i.grams,
+            })),
+            totals: {
+              calories: meal.calories,
+              protein: meal.protein,
+              fat: meal.fat,
+              carbs: meal.carbs,
+            },
+            imageUrl: meal.image_url,
+          }}
+          onClose={() => setExpanded(false)}
+        />
       )}
-    </div>
+    </>
   );
 }

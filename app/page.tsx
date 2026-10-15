@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import MealCard from "./components/MealCard";
 import styles from "./page.module.css";
 
@@ -13,10 +14,11 @@ type Ingredient = {
   carbs: number;
 };
 type Meal = {
+  name?: string;
   cuisine?: string;
   items: Ingredient[];
   totals: { calories: number; protein: number; fat: number; carbs: number };
-  imageUrl: string;
+  imageUrl?: string | null;
 };
 
 // Preloads one image URL and resolves once it's loaded (or failed) — used to serialize image
@@ -37,12 +39,24 @@ const DEFAULT_PROTEIN = 30;
 const DEFAULT_FAT = 25;
 const DEFAULT_CARBS = 45;
 
-export default function Home() {
-  const [query, setQuery] = useState("");
+function HomeInner() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(false);
 
-  async function handleGenerate() {
+  // The search bar lives in the TopBar, which puts the query in the URL (?q=...).
+  const searchParams = useSearchParams();
+  const q = searchParams.get("q");
+  const key = searchParams.toString();
+  const lastKey = useRef<string | null>(null); // stops dev StrictMode running the search twice
+
+  useEffect(() => {
+    if (!q || lastKey.current === key) return;
+    lastKey.current = key;
+    handleGenerate(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  async function handleGenerate(query: string) {
     setLoading(true);
     setMeals([]);
 
@@ -73,7 +87,7 @@ export default function Home() {
     const data = await res.json();
 
     for (const meal of data.meals ?? []) {
-      await preloadImage(meal.imageUrl);
+      if (meal.imageUrl) await preloadImage(meal.imageUrl);
       setMeals((prev) => [...prev, meal]);
     }
 
@@ -82,22 +96,12 @@ export default function Home() {
 
   return (
     <div>
-      <div className={styles.controls}>
-        <input
-          type="text"
-          placeholder="Type in your cravings"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className={styles.searchInput}
-        />
-        <button
-          className={styles.generateButton}
-          onClick={handleGenerate}
-          disabled={loading}
-        >
-          {loading ? "Generating…" : "Generate meal"}
-        </button>
-      </div>
+      {loading && meals.length === 0 && (
+        <div className={styles.loading}>
+          <div className={styles.spinner} />
+          <p>Generating meals</p>
+        </div>
+      )}
 
       <div className={styles.scrollArea}>
         {meals.map((meal, i) => (
@@ -105,5 +109,13 @@ export default function Home() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeInner />
+    </Suspense>
   );
 }

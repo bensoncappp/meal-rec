@@ -1,11 +1,19 @@
 :root {
-  --color-bg: #fafaf7;
-  --color-surface: #ffffff;
-  --color-accent: #3f6c51;
-  --color-accent-hover: #345a43;
-  --color-text: #1b1b18;
-  --color-text-muted: #6f6f68;
-  --color-border: #e7e5de;
+  /* Round The Hours palette, reused for Prep */
+  --color-bg: #f3eee3; /* warm beige page */
+  --color-surface: #faf6ee; /* cream cards / panels */
+  --color-accent: #2d4a3a; /* primary dark green button */
+  --color-accent-hover: #223a2d;
+  --color-sidebar: #223a2d; /* dark green sidebar */
+  --color-sidebar-active: #31503f;
+  --color-sidebar-text: #d9e2dc;
+  --color-highlight: #e8c75a; /* yellow marker / tag */
+  --color-danger: #c8402a; /* red-orange button / error */
+  --color-avatar: #f4a261;
+  --color-text: #1f2a24;
+  --color-text-muted: #6b6b60;
+  --color-border: #d9d2c3;
+  --color-tag-green: #dbe5da;
 }
 
 * {
