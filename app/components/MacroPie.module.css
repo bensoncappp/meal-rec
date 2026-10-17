@@ -1,0 +1,84 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.svg {
+  width: 100%;
+  max-width: 240px;
+  margin: 0 auto;
+  display: block;
+  user-select: none;
+}
+
+.sliceLabel {
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.centerValue {
+  font-size: 34px;
+  font-weight: 700;
+  fill: var(--color-text);
+  pointer-events: none;
+}
+.centerUnit {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.handle {
+  cursor: grab;
+  touch-action: none; /* stops the page scrolling while you drag on a touch screen */
+  outline: none;
+}
+.handle:active {
+  cursor: grabbing;
+}
+.handleDot {
+  fill: #ffffff;
+  stroke: var(--color-text);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+  transition: r 0.12s ease;
+}
+.handle:hover .handleDot,
+.handle:focus-visible .handleDot {
+  r: 12;
+  stroke: var(--color-accent);
+  stroke-width: 3.5;
+}
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.legendRow {
+  display: grid;
+  grid-template-columns: 12px 1fr auto 64px;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.name {
+  font-weight: 600;
+}
+.pct {
+  font-weight: 700;
+}
+.grams {
+  text-align: right;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}

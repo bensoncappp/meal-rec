@@ -1,41 +1,106 @@
-.controls {
+/* Home: results on the left, targets panel pinned to the right */
+.layout {
   display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  margin-bottom: 32px;
+  align-items: flex-start;
+  gap: 40px;
 }
-.label {
+.results {
+  flex: 1;
+  min-width: 0;
+}
+.panel {
+  position: sticky;
+  top: 24px;
+  width: 340px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 22px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-  font-weight: 500;
+  gap: 24px;
 }
-.input {
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  width: 140px;
-}
-.generateButton {
-  background: var(--color-accent);
-  color: white;
-  border: none;
-  padding: 11px 20px;
-  border-radius: 10px;
+.panelTitle {
+  margin: 0;
+  font-size: 20px;
   font-weight: 700;
-  font-size: 14px;
+}
+.panelFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+.resetButton {
+  background: transparent;
+  border: 1px solid var(--color-text);
+  border-radius: 6px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
   cursor: pointer;
 }
-.generateButton:hover {
-  background: var(--color-accent-hover);
+.resetButton:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: white;
 }
-.generateButton:disabled {
-  opacity: 0.6;
-  cursor: default;
+.hint {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--color-text-muted);
 }
+
+/* placeholder shown before the first search */
+.empty {
+  width: 560px;
+  max-width: 100%;
+  min-height: 240px;
+  border: 2px dashed var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+}
+.emptyEmoji {
+  font-size: 44px;
+  line-height: 1;
+}
+.emptyText {
+  margin: 0;
+  font-size: 16px;
+  font-style: italic;
+}
+
+.error {
+  color: var(--color-danger);
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+/* on narrower screens the panel drops above the results */
+@media (max-width: 1000px) {
+  .layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .panel {
+    order: -1;
+    position: static;
+    width: 100%;
+    max-width: 380px;
+  }
+}
+
+/* used by the Saved Meals and Boards pages */
 .grid {
   display: flex;
   flex-wrap: wrap;
@@ -49,20 +114,6 @@
   max-height: 70vh;
   overflow-y: auto;
   padding-right: 8px;
-}
-
-.searchInput {
-  flex: 1;
-  max-width: 480px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 11px 18px;
-  font-size: 14px;
-  background: var(--color-surface);
-}
-.searchInput:focus {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
 }
 
 .loading {

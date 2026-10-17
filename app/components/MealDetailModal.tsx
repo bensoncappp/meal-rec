@@ -1,3 +1,5 @@
+import MacroPie from "./MacroPie";
+import type { Split } from "@/lib/macros";
 import styles from "./MealDetailModal.module.css";
 
 type Ingredient = {
@@ -19,13 +21,28 @@ export default function MealDetailModal({
   onSave,
   saved,
   saving,
+  split,
+  onSplitChange,
+  onResetSplit,
+  resetKey,
+  adjusted,
+  limited,
 }: {
   meal: Meal;
   onClose: () => void;
   onSave?: (e: React.MouseEvent) => void;
   saved?: boolean;
   saving?: boolean;
+  // The macro pie only appears when the parent passes these (Home results). Saved Meals doesn't.
+  split?: Split;
+  onSplitChange?: (s: Split) => void;
+  onResetSplit?: () => void;
+  resetKey?: number;
+  adjusted?: boolean; // true once the user has changed the macros
+  limited?: boolean; // true when the ingredients can't reach the target any closer
 }) {
+  const showPie = !!split && !!onSplitChange;
+
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.wrap} onClick={(e) => e.stopPropagation()}>
@@ -69,6 +86,37 @@ export default function MealDetailModal({
               />
             ) : (
               <div className={styles.placeholder} />
+            )}
+
+            {showPie && (
+              <section className={styles.tune}>
+                <div className={styles.tuneHeader}>
+                  <h3 className={styles.tuneTitle}>Adjust macros</h3>
+                  {adjusted && !saved && (
+                    <button className={styles.resetBtn} onClick={onResetSplit}>
+                      Reset
+                    </button>
+                  )}
+                </div>
+
+                <MacroPie
+                  key={resetKey}
+                  value={split!}
+                  onChange={onSplitChange!}
+                  calories={Math.round(meal.totals.calories)}
+                  disabled={saved}
+                />
+
+                {saved ? (
+                  <p className={styles.note}>
+                    Saved with these macros. Adjust before saving to change a meal.
+                  </p>
+                ) : limited ? (
+                  <p className={styles.note}>
+                    Closest this meal&apos;s ingredients allow.
+                  </p>
+                ) : null}
+              </section>
             )}
           </div>
         </div>

@@ -85,19 +85,65 @@
   text-transform: capitalize;
 }
 
+/* right column: image on top, macro pie underneath */
 .imageBox {
   flex: 0 0 320px;
   align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 .image,
 .placeholder {
   width: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
   border-radius: 12px;
   object-fit: cover;
 }
 .placeholder {
   background: #f7ecea;
+}
+
+/* "Adjust macros" section */
+.tune {
+  background: var(--color-surface);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.tuneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+}
+.tuneTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.resetBtn {
+  background: transparent;
+  border: 1px solid var(--color-text);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.resetBtn:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: white;
+}
+.note {
+  margin: 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--color-text-muted);
 }
 
 .saveButton {

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import styles from "./MealCard.module.css";
 import { TEMP_USER_ID } from "@/lib/constants";
 import { supabase } from "@/lib/supabase";
+import { rebalance, splitOfItems } from "@/lib/rebalance";
+import type { Split } from "@/lib/macros";
 import MealDetailModal from "./MealDetailModal";
 import AddToBoardModal from "./AddToBoardModal";
 
@@ -23,13 +25,34 @@ type Meal = {
   imageUrl?: string | null;
 };
 
-export default function MealCard({ meal }: { meal: Meal }) {
+export default function MealCard({ meal: original }: { meal: Meal }) {
   const [savedMealId, setSavedMealId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [boards, setBoards] = useState<{ id: string; name: string }[] | null>(
     null,
   ); // not null = "Choose board" modal is open
+
+  // The macro pie lives here (not in the modal) so the card, the modal and the Save button all see
+  // the SAME adjusted meal. `split` is null until the user touches the pie = the AI's original meal.
+  const baseSplit = useMemo(() => splitOfItems(original.items), [original.items]);
+  const [split, setSplit] = useState<Split | null>(null);
+  const [resetKey, setResetKey] = useState(0); // remounts the pie on reset so its rotation resets too
+
+  const adjusted = useMemo(
+    () => (split ? rebalance(original.items, split) : null),
+    [original.items, split],
+  );
+
+  // `meal` is what everything below shows and saves: the adjusted version if there is one.
+  const meal: Meal = adjusted
+    ? { ...original, items: adjusted.items, totals: adjusted.totals }
+    : original;
+
+  function resetSplit() {
+    setSplit(null);
+    setResetKey((k) => k + 1);
+  }
 
   const previewItems = meal.items.slice(0, 4);
   const hasMore = meal.items.length > 4;
@@ -60,7 +83,7 @@ export default function MealCard({ meal }: { meal: Meal }) {
       body: JSON.stringify({
         userId: TEMP_USER_ID,
         name: meal.name ?? null,
-        ingredients: meal.items,
+        ingredients: meal.items, // the adjusted ingredients, if the user changed the macros
         totals: meal.totals,
         imageUrl: meal.imageUrl ?? null,
       }),
@@ -141,6 +164,12 @@ export default function MealCard({ meal }: { meal: Meal }) {
           onSave={handleSave}
           saved={!!savedMealId}
           saving={saving}
+          split={split ?? baseSplit}
+          onSplitChange={setSplit}
+          onResetSplit={resetSplit}
+          resetKey={resetKey}
+          adjusted={!!adjusted}
+          limited={adjusted?.limited ?? false}
         />
       )}
 
