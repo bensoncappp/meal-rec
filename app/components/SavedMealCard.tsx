@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./MealCard.module.css";
 import AddToBoardButton from "./AddToBoardButton";
 import MealDetailModal from "./MealDetailModal";
@@ -21,14 +22,18 @@ type Meal = {
 export default function SavedMealCard({
   meal,
   boards,
+  boardId,
 }: {
   meal: Meal;
   boards?: { id: string; name: string }[];
+  boardId?: string; // set when this card is shown inside a board -> the button removes it from that board
 }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState<string>(meal.name ?? "");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  const [removing, setRemoving] = useState(false);
   const memberOf = (meal.board_meals ?? []).map((bm) => bm.board_id);
 
   async function saveName() {
@@ -41,6 +46,36 @@ export default function SavedMealCard({
       body: JSON.stringify({ name: next }),
     });
     if (res.ok) setName(next);
+  }
+
+  // In Saved Meals: take it off the saved list (it stays on any boards).
+  // Inside a board: take it off that board (it stays in Saved Meals if saved).
+  async function handleRemove() {
+    const message = boardId
+      ? "Remove this meal from the board? If you saved it, it stays in Saved Meals."
+      : "Remove this meal from Saved Meals? It stays on any boards it's already on.";
+    if (!window.confirm(message)) return;
+
+    setRemoving(true);
+    const res = boardId
+      ? await fetch("/api/board-meals", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ boardId, mealId: meal.id }),
+        })
+      : await fetch(`/api/meals/${meal.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ saved: false }),
+        });
+
+    // 404 = it's already gone, which is what we wanted anyway
+    if (res.ok || res.status === 404) {
+      router.refresh(); // re-fetches the page so the card disappears
+    } else {
+      setRemoving(false);
+      window.alert("Couldn't remove it. Try again.");
+    }
   }
 
   return (
@@ -114,16 +149,23 @@ export default function SavedMealCard({
             {meal.meal_items.length > 4 && <li className={styles.more}>...</li>}
           </ul>
 
-          {boards && (
-            // stopPropagation: clicking "Add to board" shouldn't also open the detail view
-            <div onClick={(e) => e.stopPropagation()}>
+          {/* stopPropagation: clicking these buttons shouldn't also open the detail view */}
+          <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
+            {boards && (
               <AddToBoardButton
                 mealId={meal.id}
                 boards={boards}
                 memberOf={memberOf}
               />
-            </div>
-          )}
+            )}
+            <button
+              className={styles.removeBtn}
+              onClick={handleRemove}
+              disabled={removing}
+            >
+              {removing ? "Removing…" : boardId ? "Remove from board" : "Remove"}
+            </button>
+          </div>
         </div>
 
         <div className={styles.imagePanel}>

@@ -125,7 +125,7 @@ export async function POST(req: Request) {
     protein,
     fat,
     carbs,
-    cuisinePreference,
+    cuisinePreferences,
     mustInclude,
     notes,
   } = await req.json();
@@ -136,11 +136,26 @@ export async function POST(req: Request) {
   const promptLines = [
     `Generate 3 meals, each roughly ${calorieTarget} calories, targeting ${protein}% protein, ${fat}% fat, ${carbs}% carbs.`,
   ];
-  if (cuisinePreference) {
+
+  // 0 cuisines picked = no line at all, so the SYSTEM_PROMPT's "vary the cuisine" rule applies.
+  const cuisines: string[] = Array.isArray(cuisinePreferences)
+    ? cuisinePreferences
+    : [];
+  if (cuisines.length === 1) {
     promptLines.push(
-      `All 3 meals must be in the ${cuisinePreference} cuisine style (3 different dishes).`,
+      `All 3 meals must be ${cuisines[0]} cuisine (3 different dishes).`,
+    );
+  } else if (cuisines.length > 1) {
+    promptLines.push(
+      `Every meal must come from one of these cuisines: ${cuisines.join(", ")}. Spread the 3 meals across them as evenly as possible, using each cuisine before repeating one, and make every dish different.`,
     );
   }
+  if (cuisines.includes("Western")) {
+    promptLines.push(
+      `"Western" means American or European dishes (e.g. grilled steak with vegetables, pasta, a burger bowl, roast chicken).`,
+    );
+  }
+
   if (Array.isArray(mustInclude) && mustInclude.length > 0) {
     promptLines.push(
       `The user specifically asked for: ${mustInclude.join(", ")}. Every one of the 3 meals MUST prominently feature this — it should be the main protein or the star of the dish, not a side or garnish.`,
@@ -150,7 +165,6 @@ export async function POST(req: Request) {
     promptLines.push(`Also respect these preferences in every meal: ${notes}.`);
   }
   const userPrompt = promptLines.join("\n");
-
   //'await' makes it synchronous, pauses this line until Promise resovles,  if just plain 'model.generateContent' it will generate a promise instead of the result,
   // 'await' makes the code pause and wait for the actual repsonse before proceeding to next line
   // the network call is still async under the hood, we're just waiting for its result before continuing.

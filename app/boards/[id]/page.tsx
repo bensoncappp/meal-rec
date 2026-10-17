@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { sumMacros } from "@/lib/totals";
 import SavedMealCard from "../../components/SavedMealCard";
+import DeleteBoardButton from "../../components/DeleteBoardButton";
 import pageStyles from "../../page.module.css";
 import styles from "../../components/Boards.module.css";
 
@@ -27,27 +28,33 @@ export default async function BoardDetailPage({
     .filter(Boolean);
   const totals = sumMacros(meals);
 
-    return (
+  return (
     <div>
-        <Link href="/boards" className={styles.backLink}>← All boards</Link>
-        <h1 className={styles.pageTitle}>{board.name}</h1>
+      <Link href="/boards" className={styles.backLink}>
+        ← All boards
+      </Link>
 
-        <div className={styles.summary}>
+      <div className={styles.headerRow}>
+        <h1 className={styles.pageTitle}>{board.name}</h1>
+        <DeleteBoardButton boardId={board.id} boardName={board.name} />
+      </div>
+
+      <div className={styles.summary}>
         <span className={styles.tag}>{Math.round(totals.calories)} kcal</span>
         <span className={styles.tag}>P {Math.round(totals.protein)}g</span>
         <span className={styles.tag}>F {Math.round(totals.fat)}g</span>
         <span className={styles.tag}>C {Math.round(totals.carbs)}g</span>
-        </div>
+      </div>
 
-        {meals.length === 0 ? (
+      {meals.length === 0 ? (
         <p>No meals in this board yet.</p>
-        ) : (
+      ) : (
         <div className={pageStyles.grid}>
-            {meals.map((meal: any) => (
-            <SavedMealCard key={meal.id} meal={meal} />
-            ))}
+          {meals.map((meal: any) => (
+            <SavedMealCard key={meal.id} meal={meal} boardId={board.id} />
+          ))}
         </div>
-        )}
+      )}
     </div>
-    );
+  );
 }

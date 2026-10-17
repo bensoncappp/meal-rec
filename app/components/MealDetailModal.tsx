@@ -21,6 +21,8 @@ export default function MealDetailModal({
   onSave,
   saved,
   saving,
+  onAddToBoard,
+  locked,
   split,
   onSplitChange,
   onResetSplit,
@@ -30,9 +32,12 @@ export default function MealDetailModal({
 }: {
   meal: Meal;
   onClose: () => void;
+  // Home results only: Save / Saved toggle and Add to board
   onSave?: (e: React.MouseEvent) => void;
   saved?: boolean;
   saving?: boolean;
+  onAddToBoard?: (e: React.MouseEvent) => void;
+  locked?: boolean; // meal is stored (saved or on a board) -> macros can't be changed any more
   // The macro pie only appears when the parent passes these (Home results). Saved Meals doesn't.
   split?: Split;
   onSplitChange?: (s: Split) => void;
@@ -92,7 +97,7 @@ export default function MealDetailModal({
               <section className={styles.tune}>
                 <div className={styles.tuneHeader}>
                   <h3 className={styles.tuneTitle}>Adjust macros</h3>
-                  {adjusted && !saved && (
+                  {adjusted && !locked && (
                     <button className={styles.resetBtn} onClick={onResetSplit}>
                       Reset
                     </button>
@@ -104,12 +109,12 @@ export default function MealDetailModal({
                   value={split!}
                   onChange={onSplitChange!}
                   calories={Math.round(meal.totals.calories)}
-                  disabled={saved}
+                  disabled={locked}
                 />
 
-                {saved ? (
+                {locked ? (
                   <p className={styles.note}>
-                    Saved with these macros. Adjust before saving to change a meal.
+                    Macros are locked once a meal is saved or on a board.
                   </p>
                 ) : limited ? (
                   <p className={styles.note}>
@@ -121,18 +126,52 @@ export default function MealDetailModal({
           </div>
         </div>
 
-        {onSave && (
-          <button
-            className={styles.saveButton}
-            onClick={onSave}
-            disabled={saving}
-            aria-label="Save meal plan"
-          >
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 3h12v18l-6-4-6 4z" />
-            </svg>
-            <span>{saved ? "Add to board" : "Save"}</span>
-          </button>
+        {(onSave || onAddToBoard) && (
+          <div className={styles.actions}>
+            {onSave && (
+              <button
+                className={styles.actionButton}
+                onClick={onSave}
+                disabled={saving}
+                aria-label={saved ? "Remove from saved meals" : "Save meal"}
+              >
+                <svg
+                  width="30"
+                  height="30"
+                  viewBox="0 0 24 24"
+                  fill={saved ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                >
+                  <path d="M6 3h12v18l-6-4-6 4z" />
+                </svg>
+                <span>{saved ? "Saved" : "Save"}</span>
+              </button>
+            )}
+            {onAddToBoard && (
+              <button
+                className={styles.actionButton}
+                onClick={onAddToBoard}
+                disabled={saving}
+                aria-label="Add to board"
+              >
+                <svg
+                  width="30"
+                  height="30"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <rect x="4" y="4" width="16" height="16" rx="3" />
+                  <path d="M12 9v6M9 12h6" />
+                </svg>
+                <span>Add to board</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

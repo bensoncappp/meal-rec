@@ -9,11 +9,13 @@ type Board = { id: string; name: string };
 
 export default function AddToBoardModal({
   mealId,
+  getMealId,
   boards: initialBoards,
   memberOf,
   onClose,
 }: {
-  mealId: string;
+  mealId?: string; // when the meal already exists in the database
+  getMealId?: () => Promise<string | null>; // when it might not exist yet: called at the moment of adding
   boards: Board[];
   memberOf: string[]; // ids of boards this meal is already in
   onClose: () => void;
@@ -35,10 +37,17 @@ export default function AddToBoardModal({
     setBusyId(boardId);
     setError("");
 
+    const id = getMealId ? await getMealId() : (mealId ?? null);
+    if (!id) {
+      setError("Something went wrong. Try again.");
+      setBusyId(null);
+      return;
+    }
+
     const res = await fetch("/api/board-meals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ boardId, mealId }),
+      body: JSON.stringify({ boardId, mealId: id }),
     });
 
     // 409 = it was already in that board, which is fine — show it as added.

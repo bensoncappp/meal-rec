@@ -11,7 +11,7 @@ const EXTRACTION_PROMPT = `Extract structured meal-planning parameters from the 
 Rules:
 - calorieTarget: a number if mentioned, otherwise null
 - proteinPercent, fatPercent, carbPercent: numbers ONLY if the user gives an explicit macro split. Do not convert vague goals like "high protein" into a number — leave null instead.
-- cuisinePreference: a cuisine style if mentioned (e.g. "Mexican", "Japanese"), otherwise null
+- cuisinePreferences: an array of the cuisine styles the user asked for, as plain one-word names (e.g. ["Japanese"], ["Korean", "Indian"], ["Western"]). Empty array [] if none mentioned.
 - mustInclude: an array of the specific foods, ingredients or dishes the user wants the meals to feature (e.g. ["prawn"], ["salmon", "rice"], ["pad thai"]). Use plain generic names. If the user only typed a food word like "prawn" or "chicken", that IS the mustInclude. Empty array [] if none.
 - notes: a short string with any other preferences or restrictions (e.g. "spicy", "vegetarian", "no dairy", "quick to cook", "low carb"), otherwise null
 - Return ONLY valid JSON, no other text, in this exact shape:
@@ -20,7 +20,7 @@ Rules:
   "proteinPercent": 00,
   "fatPercent": 00,
   "carbPercent": 00,
-  "cuisinePreference": "string or null",
+  "cuisinePreferences": ["string"],
   "mustInclude": ["string"],
   "notes": "string or null"
 }`;

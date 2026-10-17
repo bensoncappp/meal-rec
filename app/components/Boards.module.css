@@ -94,3 +94,33 @@
   padding: 6px 10px;
   border-radius: 4px;
 }
+
+/* board page header: title on the left, delete on the right */
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.headerRow .pageTitle {
+  margin: 0;
+}
+.deleteBoard {
+  background: transparent;
+  border: 1px solid var(--color-danger);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-danger);
+  cursor: pointer;
+}
+.deleteBoard:hover {
+  background: var(--color-danger);
+  color: white;
+}
+.deleteBoard:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

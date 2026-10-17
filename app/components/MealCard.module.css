@@ -122,7 +122,21 @@
   background: #f0e1de;
 }
 
-/* bookmark beside the card, only visible on hover */
+/* Save + Add to board beside the card. Hidden until you hover the row,
+   but pinned visible once the meal is stored (saved or on a board). */
+.sideActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.row:hover .sideActions,
+.sideActions:focus-within,
+.sideActions.pinned {
+  opacity: 1;
+}
 .saveButton {
   display: flex;
   align-items: center;
@@ -134,14 +148,39 @@
   font-weight: 700;
   color: var(--color-text);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease;
 }
-.row:hover .saveButton,
-.saveButton:focus-visible,
-.savedState {
-  opacity: 1;
+.saveButton:hover {
+  text-decoration: underline;
 }
 .saveButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+
+/* row under a saved meal: Add to board + Remove */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.removeBtn {
+  background: transparent;
+  border: 1px solid var(--color-danger);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-danger);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.removeBtn:hover {
+  background: var(--color-danger);
+  color: white;
+}
+.removeBtn:disabled {
+  opacity: 0.6;
   cursor: default;
 }

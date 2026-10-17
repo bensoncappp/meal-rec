@@ -31,7 +31,9 @@ async function saveImageToStorage(sourceUrl: string): Promise<string | null> {
 }
 
 export async function POST(req: Request) {
-  const { userId, name, ingredients, totals, imageUrl } = await req.json();
+  // `saved` decides whether the meal shows up in Saved Meals. A meal can also be created just so it
+  // can sit on a board (saved: false). Left out = saved, so older callers keep working.
+  const { userId, name, ingredients, totals, imageUrl, saved } = await req.json();
 
   // If a source image URL was provided, download it and store our own permanent copy first.
   // If this fails for any reason, we still save the meal — just without an image, rather than
@@ -49,6 +51,7 @@ export async function POST(req: Request) {
       fat: totals.fat,
       carbs: totals.carbs,
       image_url: storedImageUrl,
+      is_saved: saved !== false,
     })
     .select()
     .single();
