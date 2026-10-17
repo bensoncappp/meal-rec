@@ -143,3 +143,25 @@ export function setControls(c: HomeControls) {
   controls = c;
   persist();
 }
+
+// Other pages call this the moment a meal changes (removed from Saved Meals, etc.), so the Home
+// cards are already correct when you come back — no waiting for a database check.
+export function applyMealChange(
+  mealId: string,
+  change: { saved?: boolean; deleted?: boolean },
+) {
+  loadFromSession();
+  for (const entry of entries.values()) {
+    for (const card of Object.values(entry.cards)) {
+      if (card.mealId !== mealId) continue;
+      if (change.deleted) {
+        // the meal row is gone completely -> the card goes back to "Save" / "Add to board"
+        card.mealId = null;
+        card.saved = false;
+      } else if (typeof change.saved === "boolean") {
+        card.saved = change.saved; // row still exists (it's on a board), just not saved any more
+      }
+    }
+  }
+  persist();
+}

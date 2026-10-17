@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import styles from "./TopBar.module.css";
 
 // Placeholder text per page, matching the design.
@@ -18,11 +18,33 @@ export default function TopBar() {
   const [text, setText] = useState("");
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // When you move to another page, show that page's search (empty if none),
+  // so "salmon" typed on Saved Meals doesn't follow you to Boards.
+  useEffect(() => {
+    setText(searchParams.get("q") ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Saved Meals and Boards search as you type (after a short pause).
+  // The search goes into the URL (?q=), keeping any sort that's already there.
+  function liveSearch(value: string) {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value.trim()) params.set("q", value.trim());
+      else params.delete("q");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }, 250);
+  }
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const q = text.trim();
-    // Only the Home page searches for now. Saved meals / boards search comes later.
+    // Home generates meals on Enter. The other pages already search as you type.
     if (pathname !== "/" || !q) return;
     // `t` makes the URL unique so searching the same words again regenerates.
     router.push(`/?q=${encodeURIComponent(q)}&t=${Date.now()}`);
@@ -46,7 +68,12 @@ export default function TopBar() {
         <input
           type="text"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (pathname === "/saved-meals" || pathname === "/boards") {
+              liveSearch(e.target.value);
+            }
+          }}
           placeholder={PLACEHOLDERS[pathname] ?? "Search"}
           className={styles.searchInput}
         />

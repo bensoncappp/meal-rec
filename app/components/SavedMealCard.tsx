@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { applyMealChange } from "@/lib/homeCache";
+
+
 import styles from "./MealCard.module.css";
 import AddToBoardButton from "./AddToBoardButton";
 import MealDetailModal from "./MealDetailModal";
+
 
 type MealItem = { food_name: string; grams: number };
 type Meal = {
@@ -71,6 +75,15 @@ export default function SavedMealCard({
 
     // 404 = it's already gone, which is what we wanted anyway
     if (res.ok || res.status === 404) {
+      // Tell the Home page's cached cards straight away, so they're already correct when you go back.
+      // `deleted` = nothing else used the meal, so its row was removed completely.
+      const result = res.ok ? await res.json() : { deleted: true };
+      applyMealChange(
+        meal.id,
+        boardId
+          ? { deleted: result.deleted } // removed from a board: its saved status is unchanged
+          : { saved: false, deleted: result.deleted },
+      );
       router.refresh(); // re-fetches the page so the card disappears
     } else {
       setRemoving(false);
