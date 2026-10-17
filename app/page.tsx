@@ -28,8 +28,8 @@ import {
 } from "@/lib/macros";
 import styles from "./page.module.css";
 
-// Preloads one image URL and resolves once it's loaded (or failed) — used to serialize image
-// requests one at a time, since Pollinations' free tier only allows 1 in-flight request per IP.
+// Preloads one image URL and resolves once it's loaded (or failed) — so each card only appears
+// once its picture is ready, instead of popping in half-loaded.
 function preloadImage(url: string) {
   return new Promise<void>((resolve) => {
     const img = new Image();

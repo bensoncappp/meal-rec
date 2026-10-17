@@ -34,9 +34,6 @@ Rules:
   ]
 }`;
 
-// Words/foods to explicitly exclude from the generated plate image (fights the "plastic AI food" look)
-const NEGATIVE_PROMPT =
-  "sauce, gravy, dollop, cream, mousse, blended, pudding, mixed together, garnish, mash, plastic texture, waxy, glossy shine, 3d render, cgi, illustration, cartoon, artificial";
 
 // Gives each visible ingredient an explicit clock-position on the plate instead of a vague "arranged separately" —
 // concrete positions genuinely produce cleaner, more separated results than a generic adjective would.
@@ -101,21 +98,15 @@ function buildImagePrompt(items: { food: string; grams: number }[]) {
   return `Food photography, high 45-degree angle, one single plate showing ${count} DIFFERENT foods side by side (not ${count} servings of the same food): ${layout}${sauceText}. Each food item is visually distinct from the others in shape, color and texture. Natural matte texture, visible grill char marks where relevant, shot on DSLR, soft diffused daylight, shallow depth of field, realistic, appetizing, plain background, no extra garnish, no text, no utensils`;
 }
 
-// Turns a text prompt into a real Pollinations image URL. No API key needed — the URL itself IS the generated image;
-// the browser triggers the actual generation the moment an <img> tag tries to load this URL.
+// Turns a text prompt into a URL on OUR OWN server (/api/plate-image), which asks Cloudflare Workers AI (FLUX.1 schnell, free tier)
+// to draw the image. Like before, the browser triggers the generation when an <img> tries to load this URL,
+// and the same prompt + seed always gives the same image, so the URL is safe to cache and re-use.
 function buildImageUrl(prompt: string) {
   const params = new URLSearchParams({
-    model: "flux",
-    width: "512",
-    height: "512",
-    nologo: "true",
-    enhance: "false", // stops Pollinations' own LLM from silently rewriting/embellishing our prompt
-    private: "true",
-    negative_prompt: NEGATIVE_PROMPT, // was "negative" — wrong key, was being ignored entirely
+    p: prompt,
     seed: String(Math.floor(Math.random() * 1_000_000)), // different image each generation, not a repeat
   });
-
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params.toString()}`;
+  return `/api/plate-image?${params.toString()}`;
 }
 
 //conventiaonl set style to write like this

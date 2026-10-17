@@ -1,21 +1,29 @@
 import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
-// Downloads the image from a given URL (e.g. Pollinations' live-generation URL) and uploads
+// Downloads the image from a given URL (our own /api/plate-image route) and uploads
 // the actual bytes into Supabase Storage, returning a stable, permanent public URL.
 // This means saved meals own their own copy of the image instead of depending on
-// Pollinations staying up or that seed/prompt combo still resolving the same way later.
-async function saveImageToStorage(sourceUrl: string): Promise<string | null> {
+// the image generator being up, or on that prompt still giving the same picture later.
+async function saveImageToStorage(
+  sourceUrl: string,
+  origin: string,
+): Promise<string | null> {
   try {
-    const imageRes = await fetch(sourceUrl);
+    // Our own images come back as a relative URL (/api/plate-image?...), which a server-side fetch can't use on its own,
+    // so resolve it against this request's origin.
+    const imageRes = await fetch(new URL(sourceUrl, origin));
     if (!imageRes.ok) return null;
 
     const buffer = Buffer.from(await imageRes.arrayBuffer());
-    const fileName = `${crypto.randomUUID()}.png`;
+    // Keep the real type (FLUX gives JPEG) instead of labelling everything png.
+    const contentType = imageRes.headers.get("content-type") ?? "image/png";
+    const ext = contentType.includes("jpeg") ? "jpg" : "png";
+    const fileName = `${crypto.randomUUID()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("meal-images")
-      .upload(fileName, buffer, { contentType: "image/png" });
+      .upload(fileName, buffer, { contentType });
 
     if (uploadError) {
       console.error("Image upload failed:", uploadError.message);
@@ -38,7 +46,9 @@ export async function POST(req: Request) {
   // If a source image URL was provided, download it and store our own permanent copy first.
   // If this fails for any reason, we still save the meal — just without an image, rather than
   // blocking the whole save on an image problem.
-  const storedImageUrl = imageUrl ? await saveImageToStorage(imageUrl) : null;
+  const storedImageUrl = imageUrl
+    ? await saveImageToStorage(imageUrl, new URL(req.url).origin)
+    : null;
 
   // 1. Insert the meal itself, get back its generated id
   const { data: meal, error: mealError } = await supabase
