@@ -75,6 +75,10 @@ function HomeInner() {
       fat: parsed.fatPercent ?? DEFAULT_FAT,
       carbs: parsed.carbPercent ?? DEFAULT_CARBS,
       cuisinePreference: parsed.cuisinePreference ?? null,
+      // what the user actually asked to see (e.g. "prawn") + other preferences (e.g. "spicy").
+      // Without these the generator never learns what the craving was.
+      mustInclude: parsed.mustInclude ?? [],
+      notes: parsed.notes ?? null,
     };
 
     // Step 3 — generate, exactly as before, just with resolved values instead of raw form inputs

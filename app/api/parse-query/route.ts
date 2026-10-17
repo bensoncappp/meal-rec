@@ -12,13 +12,17 @@ Rules:
 - calorieTarget: a number if mentioned, otherwise null
 - proteinPercent, fatPercent, carbPercent: numbers ONLY if the user gives an explicit macro split. Do not convert vague goals like "high protein" into a number — leave null instead.
 - cuisinePreference: a cuisine style if mentioned (e.g. "Mexican", "Japanese"), otherwise null
+- mustInclude: an array of the specific foods, ingredients or dishes the user wants the meals to feature (e.g. ["prawn"], ["salmon", "rice"], ["pad thai"]). Use plain generic names. If the user only typed a food word like "prawn" or "chicken", that IS the mustInclude. Empty array [] if none.
+- notes: a short string with any other preferences or restrictions (e.g. "spicy", "vegetarian", "no dairy", "quick to cook", "low carb"), otherwise null
 - Return ONLY valid JSON, no other text, in this exact shape:
 {
   "calorieTarget": 000,
   "proteinPercent": 00,
   "fatPercent": 00,
   "carbPercent": 00,
-  "cuisinePreference": "string or null"
+  "cuisinePreference": "string or null",
+  "mustInclude": ["string"],
+  "notes": "string or null"
 }`;
 
 export async function POST(req: Request) {
@@ -34,6 +38,7 @@ export async function POST(req: Request) {
           parts: [{ text: EXTRACTION_PROMPT + "\n\nUser request: " + query }],
         },
       ],
+      config: { responseMimeType: "application/json" }, // ask Gemini for raw JSON, no markdown fences
     });
   } catch (err: any) {
     return NextResponse.json(

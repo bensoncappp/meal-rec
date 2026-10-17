@@ -1,0 +1,2875 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+app/
+  api/
+    board-meals/
+      route.ts
+    boards/
+      route.ts
+    generate-meal/
+      route.ts
+    meals/
+      [id]/
+        route.ts
+      route.ts
+    parse-query/
+      route.ts
+  boards/
+    [id]/
+      page.tsx
+    page.tsx
+  components/
+    AddToBoardButton.tsx
+    AddToBoardModal.module.css
+    AddToBoardModal.tsx
+    Boards.module.css
+    MealCard.module.css
+    MealCard.tsx
+    MealDetailModal.module.css
+    MealDetailModal.tsx
+    SavedMealCard.tsx
+    Sidebar.module.css
+    Sidebar.tsx
+    TopBar.module.css
+    TopBar.tsx
+  saved-meals/
+    page.tsx
+  favicon.ico
+  globals.css
+  layout.module.css
+  layout.tsx
+  page.module.css
+  page.tsx
+docs/
+  erd.md
+lib/
+  constants.ts
+  supabase.ts
+  totals.ts
+public/
+  file.svg
+  globe.svg
+  next.svg
+  placeholder-meal.png
+  vercel.svg
+  window.svg
+testingImageGeneration/
+  test-image.js
+  test-meal-image.png
+.gitignore
+AGENTS.md
+CLAUDE.md
+eslint.config.mjs
+next.config.ts
+package.json
+postcss.config.mjs
+README.md
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="app/api/board-meals/route.ts">
+import { supabase } from "@/lib/supabase";
+import { NextResponse } from "next/server";
+
+export async function POST(req: Request) {
+  const { boardId, mealId } = await req.json();
+
+  const { error } = await supabase
+    .from("board_meals")
+    .insert({ board_id: boardId, meal_id: mealId });
+
+  if (error) {
+    // 23505 = primary key violation: this meal is already linked to this board.
+    // The composite primary key on board_meals is what enforces this.
+    if (error.code === "23505") {
+      return NextResponse.json({ error: "Already in this board" }, { status: 409 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
+</file>
+
+<file path="app/api/boards/route.ts">
+import { supabase } from "@/lib/supabase";
+import { NextResponse } from "next/server";
+
+export async function POST(req: Request) {
+  const { userId, name } = await req.json();
+
+  if (!name || !name.trim()) {
+    return NextResponse.json({ error: "Board name is required" }, { status: 400 });
+  }
+
+  const { data: board, error } = await supabase
+    .from("boards")
+    .insert({ user_id: userId, name: name.trim() })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ board });
+}
+</file>
+
+<file path="app/api/meals/[id]/route.ts">
+import { supabase } from "@/lib/supabase";
+import { NextResponse } from "next/server";
+
+// Renames a saved meal. `params` is a Promise in this Next.js version.
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const { name } = await req.json();
+  const trimmed = typeof name === "string" ? name.trim().slice(0, 80) : "";
+
+  if (!trimmed) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("meals")
+    .update({ name: trimmed })
+    .eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, name: trimmed });
+}
+</file>
+
+<file path="app/components/AddToBoardButton.tsx">
+"use client";
+
+import { useState } from "react";
+import AddToBoardModal from "./AddToBoardModal";
+import styles from "./Boards.module.css";
+
+export default function AddToBoardButton({
+  mealId,
+  boards,
+  memberOf,
+}: {
+  mealId: string;
+  boards: { id: string; name: string }[];
+  memberOf: string[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button className={styles.addButton} onClick={() => setOpen(true)}>
+        Add to board
+      </button>
+      {open && (
+        <AddToBoardModal
+          mealId={mealId}
+          boards={boards}
+          memberOf={memberOf}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+</file>
+
+<file path="app/components/AddToBoardModal.tsx">
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { TEMP_USER_ID } from "@/lib/constants";
+import styles from "./AddToBoardModal.module.css";
+
+type Board = { id: string; name: string };
+
+export default function AddToBoardModal({
+  mealId,
+  boards: initialBoards,
+  memberOf,
+  onClose,
+}: {
+  mealId: string;
+  boards: Board[];
+  memberOf: string[]; // ids of boards this meal is already in
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [boards, setBoards] = useState<Board[]>(initialBoards);
+  const [added, setAdded] = useState<string[]>(memberOf);
+  const [search, setSearch] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [error, setError] = useState("");
+
+  const visible = boards.filter((b) =>
+    b.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  async function addToBoard(boardId: string) {
+    setBusyId(boardId);
+    setError("");
+
+    const res = await fetch("/api/board-meals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ boardId, mealId }),
+    });
+
+    // 409 = it was already in that board, which is fine — show it as added.
+    if (res.ok || res.status === 409) {
+      setAdded((prev) => (prev.includes(boardId) ? prev : [...prev, boardId]));
+    } else {
+      setError("Something went wrong. Try again.");
+    }
+    setBusyId(null);
+  }
+
+  async function createAndAdd() {
+    if (!newName.trim()) return;
+    setBusyId("new");
+    setError("");
+
+    const res = await fetch("/api/boards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: TEMP_USER_ID, name: newName }),
+    });
+
+    if (!res.ok) {
+      setError("Couldn't create the board.");
+      setBusyId(null);
+      return;
+    }
+
+    const { board } = await res.json();
+    setBoards((prev) => [board, ...prev]);
+    setNewName("");
+    setCreating(false);
+    await addToBoard(board.id); // creating a board also adds the meal to it
+  }
+
+  // Refresh on close so the page behind the modal picks up the changes.
+  function handleClose() {
+    router.refresh();
+    onClose();
+  }
+
+  return (
+    <div className={styles.overlay} onClick={handleClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <h2 className={styles.title}>Choose board</h2>
+
+        <input
+          className={styles.search}
+          placeholder="Search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        <div className={styles.list}>
+          {visible.length === 0 && (
+            <p className={styles.empty}>
+              {boards.length === 0 ? "No boards yet — create one below." : "No boards match."}
+            </p>
+          )}
+          {visible.map((b) => (
+            <div key={b.id} className={styles.row}>
+              <span className={styles.boardName}>{b.name}</span>
+              {added.includes(b.id) ? (
+                <span className={styles.addedLabel}>Added ✓</span>
+              ) : (
+                <button
+                  className={styles.addBtn}
+                  onClick={() => addToBoard(b.id)}
+                  disabled={busyId === b.id}
+                >
+                  {busyId === b.id ? "Adding…" : "Add"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {error && <p className={styles.error}>{error}</p>}
+
+        <div className={styles.footer}>
+          {creating ? (
+            <div className={styles.createForm}>
+              <input
+                autoFocus
+                className={styles.createInput}
+                placeholder="Board name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && createAndAdd()}
+              />
+              <button
+                className={styles.addBtn}
+                onClick={createAndAdd}
+                disabled={busyId === "new"}
+              >
+                Create
+              </button>
+            </div>
+          ) : (
+            <button className={styles.createRow} onClick={() => setCreating(true)}>
+              <span className={styles.plus}>+</span>
+              Create board
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/layout.module.css">
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.content {
+  padding: 32px 40px;
+  flex: 1;
+}
+</file>
+
+<file path="lib/constants.ts">
+// TEMPORARY — remove once real Supabase Auth is wired up.
+// This stands in for "the currently logged-in user" until then.
+export const TEMP_USER_ID = "a2300e71-e7ef-43f9-bed6-a5b998f3b1ef";
+</file>
+
+<file path="lib/supabase.ts">
+import { createClient } from "@supabase/supabase-js";
+
+//Any file that needs to query the database imports { supabase } from here, rather than creating a new client every time.
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+);
+</file>
+
+<file path="lib/totals.ts">
+export type Macros = {
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+};
+
+// A board's totals are never stored — they're summed from its meals every time they're read,
+// so they can't go stale if a meal changes or gets removed from the board.
+export function sumMacros(meals: Macros[]): Macros {
+  return meals.reduce(
+    (total, m) => ({
+      calories: total.calories + Number(m.calories ?? 0),
+      protein: total.protein + Number(m.protein ?? 0),
+      fat: total.fat + Number(m.fat ?? 0),
+      carbs: total.carbs + Number(m.carbs ?? 0),
+    }),
+    { calories: 0, protein: 0, fat: 0, carbs: 0 },
+  );
+}
+</file>
+
+<file path="public/file.svg">
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+</file>
+
+<file path="public/globe.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+</file>
+
+<file path="public/next.svg">
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
+</file>
+
+<file path="public/vercel.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+</file>
+
+<file path="public/window.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+</file>
+
+<file path="testingImageGeneration/test-image.js">
+const fs = require("fs");
+
+const sampleIngredients = [
+  { food: "one whole 150g pan-seared chicken breast fillet", grams: 150 },
+  { food: "fluffy white rice", grams: 200 },
+  { food: "steamed broccoli florets", grams: 120 },
+  { food: "extra virgin olive oil", grams: 10 }, // filtered out
+];
+
+const VISIBLE_THRESHOLD_GRAMS = 15;
+const visibleIngredients = sampleIngredients.filter(
+  (item) => item.grams >= VISIBLE_THRESHOLD_GRAMS,
+);
+
+// Give each food an explicit clock-position on the plate, instead of a vague "arranged separately"
+const positions = ["at 12 o'clock", "at 4 o'clock", "at 8 o'clock"];
+const layout = visibleIngredients
+  .map((item, i) => `${positions[i]}: ${item.food}`)
+  .join(", ");
+
+const prompt = `Food photography, high 45-degree angle, one white circular plate with three separate portions: ${layout}. Natural matte texture, visible grill char marks on the chicken, shot on DSLR, soft diffused daylight, shallow depth of field, realistic, appetizing, plain background, no sauce, no garnish, no text, no utensils`;
+const negativePrompt =
+  "sauce, gravy, dollop, cream, mousse, blended, pudding, mixed together, garnish, mash, plastic texture, waxy, glossy shine, 3d render, cgi, illustration, cartoon, artificial";
+
+async function testImageGeneration() {
+  const params = new URLSearchParams({
+    model: "flux",
+    width: "1024",
+    height: "1024",
+    nologo: "true",
+    enhance: "false",
+    private: "true",
+    negative: negativePrompt,
+    seed: String(Math.floor(Math.random() * 1000000)),
+  });
+
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params.toString()}`;
+
+  console.log("Requesting:", url);
+  const start = Date.now();
+
+  const res = await fetch(url);
+  const elapsed = Date.now() - start;
+
+  if (!res.ok) {
+    console.log(`FAILED — status ${res.status}`);
+    return;
+  }
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync("test-meal-image.png", buffer);
+
+  console.log(`Success — ${elapsed}ms — saved to test-meal-image.png`);
+}
+
+testImageGeneration();
+</file>
+
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="AGENTS.md">
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
+</file>
+
+<file path="CLAUDE.md">
+@AGENTS.md
+</file>
+
+<file path="eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+</file>
+
+<file path="postcss.config.mjs">
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+</file>
+
+<file path="README.md">
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+</file>
+
+<file path="app/api/meals/route.ts">
+import { supabase } from "@/lib/supabase";
+import { NextResponse } from "next/server";
+
+// Downloads the image from a given URL (e.g. Pollinations' live-generation URL) and uploads
+// the actual bytes into Supabase Storage, returning a stable, permanent public URL.
+// This means saved meals own their own copy of the image instead of depending on
+// Pollinations staying up or that seed/prompt combo still resolving the same way later.
+async function saveImageToStorage(sourceUrl: string): Promise<string | null> {
+  try {
+    const imageRes = await fetch(sourceUrl);
+    if (!imageRes.ok) return null;
+
+    const buffer = Buffer.from(await imageRes.arrayBuffer());
+    const fileName = `${crypto.randomUUID()}.png`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("meal-images")
+      .upload(fileName, buffer, { contentType: "image/png" });
+
+    if (uploadError) {
+      console.error("Image upload failed:", uploadError.message);
+      return null;
+    }
+
+    const { data } = supabase.storage.from("meal-images").getPublicUrl(fileName);
+    return data.publicUrl;
+  } catch (err) {
+    console.error("Image fetch/upload error:", err);
+    return null;
+  }
+}
+
+export async function POST(req: Request) {
+  const { userId, name, ingredients, totals, imageUrl } = await req.json();
+
+  // If a source image URL was provided, download it and store our own permanent copy first.
+  // If this fails for any reason, we still save the meal — just without an image, rather than
+  // blocking the whole save on an image problem.
+  const storedImageUrl = imageUrl ? await saveImageToStorage(imageUrl) : null;
+
+  // 1. Insert the meal itself, get back its generated id
+  const { data: meal, error: mealError } = await supabase
+    .from("meals")
+    .insert({
+      user_id: userId,
+      name: name ?? null,
+      calories: totals.calories,
+      protein: totals.protein,
+      fat: totals.fat,
+      carbs: totals.carbs,
+      image_url: storedImageUrl,
+    })
+    .select()
+    .single();
+
+  if (mealError) {
+    return NextResponse.json({ error: mealError.message }, { status: 500 });
+  }
+
+  // 2. Insert each ingredient, linked to that meal's id
+  const items = ingredients.map((item: any) => ({
+    meal_id: meal.id,
+    food_name: item.food,
+    grams: item.grams,
+    calories: item.calories,
+    protein: item.protein,
+    fat: item.fat,
+    carbs: item.carbs,
+  }));
+
+  const { error: itemsError } = await supabase.from("meal_items").insert(items);
+
+  if (itemsError) {
+    return NextResponse.json({ error: itemsError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, mealId: meal.id });
+}
+</file>
+
+<file path="app/api/parse-query/route.ts">
+import { GoogleGenAI } from "@google/genai";
+import { NextResponse } from "next/server";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+// This step's ONLY job is understanding what the user typed — not generating food.
+// Same principle as the AI/algorithm split for portions: each step does the one thing it's best at,
+// and defaults for anything unspecified are applied by our own code, not guessed by the AI.
+const EXTRACTION_PROMPT = `Extract structured meal-planning parameters from the user's natural-language request.
+
+Rules:
+- calorieTarget: a number if mentioned, otherwise null
+- proteinPercent, fatPercent, carbPercent: numbers ONLY if the user gives an explicit macro split. Do not convert vague goals like "high protein" into a number — leave null instead.
+- cuisinePreference: a cuisine style if mentioned (e.g. "Mexican", "Japanese"), otherwise null
+- Return ONLY valid JSON, no other text, in this exact shape:
+{
+  "calorieTarget": 000,
+  "proteinPercent": 00,
+  "fatPercent": 00,
+  "carbPercent": 00,
+  "cuisinePreference": "string or null"
+}`;
+
+export async function POST(req: Request) {
+  const { query } = await req.json();
+
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model: "gemini-3.5-flash-lite",
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: EXTRACTION_PROMPT + "\n\nUser request: " + query }],
+        },
+      ],
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: "Query parsing failed", detail: err.message ?? String(err) },
+      { status: 502 },
+    );
+  }
+
+  const text = response.text;
+  if (!text) {
+    return NextResponse.json(
+      { error: "Gemini returned no text" },
+      { status: 500 },
+    );
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    return NextResponse.json(parsed);
+  } catch {
+    return NextResponse.json(
+      { error: "Gemini returned invalid JSON", raw: text },
+      { status: 500 },
+    );
+  }
+}
+</file>
+
+<file path="app/boards/[id]/page.tsx">
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { sumMacros } from "@/lib/totals";
+import SavedMealCard from "../../components/SavedMealCard";
+import pageStyles from "../../page.module.css";
+import styles from "../../components/Boards.module.css";
+
+export default async function BoardDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const { data, error } = await supabase
+    .from("boards")
+    .select("id, name, board_meals(meals(*, meal_items(*)))")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) notFound();
+
+  const board = data as any;
+  const meals = (board.board_meals ?? [])
+    .map((bm: any) => bm.meals)
+    .filter(Boolean);
+  const totals = sumMacros(meals);
+
+    return (
+    <div>
+        <Link href="/boards" className={styles.backLink}>← All boards</Link>
+        <h1 className={styles.pageTitle}>{board.name}</h1>
+
+        <div className={styles.summary}>
+        <span className={styles.tag}>{Math.round(totals.calories)} kcal</span>
+        <span className={styles.tag}>P {Math.round(totals.protein)}g</span>
+        <span className={styles.tag}>F {Math.round(totals.fat)}g</span>
+        <span className={styles.tag}>C {Math.round(totals.carbs)}g</span>
+        </div>
+
+        {meals.length === 0 ? (
+        <p>No meals in this board yet.</p>
+        ) : (
+        <div className={pageStyles.grid}>
+            {meals.map((meal: any) => (
+            <SavedMealCard key={meal.id} meal={meal} />
+            ))}
+        </div>
+        )}
+    </div>
+    );
+}
+</file>
+
+<file path="app/boards/page.tsx">
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { TEMP_USER_ID } from "@/lib/constants";
+import { sumMacros } from "@/lib/totals";
+import styles from "../components/Boards.module.css";
+
+export default async function BoardsPage() {
+  // Each board with the macros of every meal linked to it through board_meals.
+  const { data: boards, error } = await supabase
+    .from("boards")
+    .select(
+      "id, name, board_meals(meals(calories, protein, fat, carbs, image_url))",
+    )
+    .eq("user_id", TEMP_USER_ID)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return <p>Failed to load boards: {error.message}</p>;
+  }
+
+  if (!boards || boards.length === 0) {
+    return (
+      <div>
+        <h1 className={styles.pageTitle}>Your Saved Boards</h1>
+        <p>No boards yet — use "Add to board" on a saved meal to create one.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className={styles.pageTitle}>Your Saved Boards</h1>
+      <div className={styles.boardGrid}>
+        {boards.map((board: any) => {
+          const meals = (board.board_meals ?? [])
+            .map((bm: any) => bm.meals)
+            .filter(Boolean);
+          const totals = sumMacros(meals);
+          const thumbs = meals
+            .map((m: any) => m.image_url)
+            .filter(Boolean)
+            .slice(0, 4);
+
+          return (
+            <Link
+              key={board.id}
+              href={`/boards/${board.id}`}
+              className={styles.boardLink}
+            >
+              <div className={styles.boardCard}>
+                {thumbs.map((src: string, i: number) => (
+                  <img key={i} src={src} alt="" className={styles.boardThumb} />
+                ))}
+              </div>
+              <div className={styles.boardMeta}>
+                <span className={styles.boardName}>{board.name}</span>
+                <span className={styles.boardTotals}>
+                  ={Math.round(totals.calories)}kcal
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/components/AddToBoardModal.module.css">
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(34, 58, 45, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal {
+  background: var(--color-surface);
+  border-radius: 16px;
+  padding: 24px;
+  width: 400px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.title { margin: 0; text-align: center; font-size: 20px; }
+.search {
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 80px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+.row:hover { background: var(--color-bg); }
+.boardName { font-weight: 700; font-size: 15px; }
+.addBtn {
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.addBtn:hover { background: var(--color-accent-hover); }
+.addBtn:disabled { opacity: 0.6; cursor: default; }
+.addedLabel {
+  background: var(--color-tag-green);
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border-radius: 4px;
+}
+.empty { color: var(--color-text-muted); font-size: 14px; padding: 8px 12px; }
+.footer { border-top: 1px solid var(--color-border); padding-top: 12px; }
+.createRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.createRow:hover { background: var(--color-bg); }
+.plus {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+.createForm { display: flex; gap: 8px; }
+.createInput {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.error { color: var(--color-danger); font-size: 13px; margin: 0; }
+</file>
+
+<file path="app/components/Boards.module.css">
+/* "Add to board" = the secondary outlined button from Round The Hours */
+.addButton {
+  background: transparent;
+  border: 1px solid var(--color-text);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.addButton:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: white;
+}
+
+.pageTitle {
+  margin: 0 0 28px;
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.boardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 28px;
+}
+.boardLink {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.boardCard {
+  height: 190px;
+  border: 1.5px solid var(--color-text);
+  border-radius: 22px;
+  background: var(--color-surface);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  transition: box-shadow 0.15s ease;
+}
+.boardLink:hover .boardCard {
+  box-shadow: 0 6px 18px rgba(34, 58, 45, 0.15);
+}
+.boardThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.boardMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 6px;
+}
+.boardName {
+  font-size: 17px;
+  font-weight: 700;
+  font-style: italic;
+}
+.boardTotals {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 14px;
+}
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+/* small uppercase pill, like the tags in Round The Hours */
+.tag {
+  background: var(--color-tag-green);
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+</file>
+
+<file path="app/components/MealDetailModal.module.css">
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(34, 58, 45, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 24px;
+}
+
+.wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  max-height: 90vh;
+}
+
+.modal {
+  position: relative;
+  display: flex;
+  gap: 32px;
+  background: #e6e0d2;
+  border-radius: 28px;
+  padding: 36px;
+  width: min(860px, 80vw);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.closeButton {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.left {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-size: 28px;
+}
+.calories {
+  margin: 8px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.cuisine {
+  margin: 10px 0 0;
+  font-style: italic;
+  font-size: 14px;
+}
+.macros {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0 28px;
+  font-style: italic;
+  font-size: 14px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-text);
+  font-size: 15px;
+}
+.item:last-child {
+  border-bottom: none;
+}
+.food {
+  text-transform: capitalize;
+}
+
+.imageBox {
+  flex: 0 0 320px;
+  align-self: flex-start;
+}
+.image,
+.placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.placeholder {
+  background: #f7ecea;
+}
+
+.saveButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding-top: 24px;
+}
+.saveButton:disabled {
+  cursor: default;
+}
+
+@media (max-width: 800px) {
+  .modal {
+    flex-direction: column-reverse;
+  }
+  .imageBox {
+    flex-basis: auto;
+  }
+}
+</file>
+
+<file path="app/components/MealDetailModal.tsx">
+import styles from "./MealDetailModal.module.css";
+
+type Ingredient = {
+  food: string;
+  grams: number;
+};
+
+type Meal = {
+  name?: string | null;
+  cuisine?: string;
+  items: Ingredient[];
+  totals: { calories: number; protein: number; fat: number; carbs: number };
+  imageUrl?: string | null;
+};
+
+export default function MealDetailModal({
+  meal,
+  onClose,
+  onSave,
+  saved,
+  saving,
+}: {
+  meal: Meal;
+  onClose: () => void;
+  onSave?: (e: React.MouseEvent) => void;
+  saved?: boolean;
+  saving?: boolean;
+}) {
+  return (
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.wrap} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modal}>
+          <button
+            className={styles.closeButton}
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+
+          <div className={styles.left}>
+            <h2 className={styles.title}>{meal.name || "Untitled meal"}</h2>
+            <p className={styles.calories}>
+              {Math.round(meal.totals.calories)} kcal
+            </p>
+            {meal.cuisine && <p className={styles.cuisine}>{meal.cuisine}</p>}
+            <div className={styles.macros}>
+              <span>P {Math.round(meal.totals.protein)}g</span>
+              <span>F {Math.round(meal.totals.fat)}g</span>
+              <span>C {Math.round(meal.totals.carbs)}g</span>
+            </div>
+
+            <ul className={styles.list}>
+              {meal.items.map((item) => (
+                <li key={item.food} className={styles.item}>
+                  <span className={styles.food}>{item.food}</span>
+                  <span>{item.grams}g</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className={styles.imageBox}>
+            {meal.imageUrl ? (
+              <img
+                src={meal.imageUrl}
+                alt={meal.name ?? meal.cuisine ?? "Meal"}
+                className={styles.image}
+              />
+            ) : (
+              <div className={styles.placeholder} />
+            )}
+          </div>
+        </div>
+
+        {onSave && (
+          <button
+            className={styles.saveButton}
+            onClick={onSave}
+            disabled={saving}
+            aria-label="Save meal plan"
+          >
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 3h12v18l-6-4-6 4z" />
+            </svg>
+            <span>{saved ? "Add to board" : "Save"}</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/components/Sidebar.module.css">
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--color-sidebar);
+  padding: 32px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+}
+.logo {
+  font-family: var(--font-logo), cursive;
+  font-size: 44px;
+  line-height: 1;
+  color: #ffffff;
+  padding-left: 32px;
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.link {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 32px;
+  border-left: 4px solid transparent;
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+  font-size: 17px;
+  font-weight: 500;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.link svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.link:hover {
+  background: var(--color-sidebar-active);
+  color: #ffffff;
+}
+.active {
+  background: var(--color-sidebar-active);
+  border-left-color: var(--color-highlight);
+  color: #ffffff;
+  font-weight: 700;
+}
+</file>
+
+<file path="app/components/Sidebar.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import styles from "./Sidebar.module.css";
+
+const NAV_ITEMS = [
+  { href: "/", label: "Home", icon: HomeIcon },
+  { href: "/saved-meals", label: "Saved Meals", icon: MealIcon },
+  { href: "/boards", label: "Boards", icon: BoardIcon },
+];
+
+export default function Sidebar() {
+  const pathname = usePathname();
+
+  return (
+    <nav className={styles.sidebar}>
+      <div className={styles.logo}>Prep</div>
+      <ul className={styles.list}>
+        {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              className={`${styles.link} ${
+                pathname === href || (href !== "/" && pathname.startsWith(href))
+                  ? styles.active
+                  : ""
+              }`}
+            >
+              <Icon />
+              <span>{label}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        d="M3 11.5 12 4l9 7.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5.5 10v9a1 1 0 0 0 1 1H17.5a1 1 0 0 0 1-1v-9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+function MealIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5v4.5l3 2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function BoardIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <rect x="4" y="4" width="7" height="7" rx="1.2" />
+      <rect x="13" y="4" width="7" height="16" rx="1.2" />
+      <rect x="4" y="13" width="7" height="7" rx="1.2" />
+    </svg>
+  );
+}
+</file>
+
+<file path="app/components/TopBar.module.css">
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 40px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+  gap: 24px;
+}
+.authArea {
+  position: relative;
+}
+.signInButton {
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.signInButton:hover {
+  background: var(--color-accent-hover);
+}
+.profileWrap {
+  position: relative;
+}
+.profileButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--color-text);
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-avatar);
+  color: var(--color-text);
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+.dropdown {
+  position: absolute;
+  right: 0;
+  top: 52px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  min-width: 140px;
+  overflow: hidden;
+}
+.dropdownItem {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.dropdownItem:hover {
+  background: var(--color-bg);
+}
+
+.search {
+  flex: 1;
+  max-width: 760px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #e6e0d2;
+  border-radius: 12px;
+  padding: 0 16px;
+  color: var(--color-text-muted);
+}
+.searchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 14px 0;
+  font-size: 16px;
+  font-style: italic;
+  color: var(--color-text);
+  outline: none;
+}
+.search:focus-within {
+  outline: 2px solid var(--color-accent);
+}
+</file>
+
+<file path="app/components/TopBar.tsx">
+"use client";
+
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import styles from "./TopBar.module.css";
+
+// Placeholder text per page, matching the design.
+const PLACEHOLDERS: Record<string, string> = {
+  "/": "Type in your cravings",
+  "/saved-meals": "Search your saved meals",
+  "/boards": "Search your boards",
+};
+
+export default function TopBar() {
+  // Placeholder state — swap for real session data once Google OAuth is wired up.
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [text, setText] = useState("");
+  const pathname = usePathname();
+  const router = useRouter();
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = text.trim();
+    // Only the Home page searches for now. Saved meals / boards search comes later.
+    if (pathname !== "/" || !q) return;
+    // `t` makes the URL unique so searching the same words again regenerates.
+    router.push(`/?q=${encodeURIComponent(q)}&t=${Date.now()}`);
+  }
+
+  return (
+    <header className={styles.topbar}>
+      <form className={styles.search} onSubmit={handleSearch}>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={PLACEHOLDERS[pathname] ?? "Search"}
+          className={styles.searchInput}
+        />
+      </form>
+
+      <div className={styles.authArea}>
+        {isSignedIn ? (
+          <div className={styles.profileWrap}>
+            <button
+              className={styles.profileButton}
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label="Account menu"
+            >
+              <span className={styles.avatar}>B</span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className={styles.dropdown}>
+                <button
+                  className={styles.dropdownItem}
+                  onClick={() => {
+                    setIsSignedIn(false);
+                    setMenuOpen(false);
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            className={styles.signInButton}
+            onClick={() => setIsSignedIn(true)}
+          >
+            Sign in
+          </button>
+        )}
+      </div>
+    </header>
+  );
+}
+</file>
+
+<file path="docs/erd.md">
+# Database ERD
+
+This ERD is based on `db/schema.sql`.
+
+```mermaid
+erDiagram
+    PROFILES {
+        uuid id PK "references auth.users(id)"
+        varchar email
+        varchar name
+        text avatar_url
+        timestamp created_at
+    }
+
+    MEALS {
+        uuid id PK
+        uuid user_id FK
+        varchar name
+        numeric calories
+        numeric protein
+        numeric fat
+        numeric carbs
+        timestamp created_at
+    }
+
+    MEAL_ITEMS {
+        uuid id PK
+        uuid meal_id FK
+        varchar food_name
+        numeric grams
+        numeric calories
+        numeric protein
+        numeric fat
+        numeric carbs
+        text image_url
+    }
+
+    BOARDS {
+        uuid id PK
+        uuid user_id FK
+        varchar name
+        timestamp created_at
+    }
+
+    BOARD_MEALS {
+        uuid board_id FK
+        uuid meal_id FK
+    }
+
+    PROFILES ||--o{ MEALS : saves
+    PROFILES ||--o{ BOARDS : creates
+    MEALS ||--o{ MEAL_ITEMS : contains
+    BOARDS ||--o{ BOARD_MEALS : links
+    MEALS ||--o{ BOARD_MEALS : "linked in"
+```
+
+## Relationship Summary
+
+| Parent table | Child table   | Relationship                                                  |
+| ------------ | ------------- | ------------------------------------------------------------- |
+| `profiles`   | `meals`       | One user can save many meals.                                 |
+| `profiles`   | `boards`      | One user can create many boards.                              |
+| `meals`      | `meal_items`  | One meal contains many food items with their own macros.      |
+| `boards`     | `board_meals` | One board links to many meals via a join table.               |
+| `meals`      | `board_meals` | One meal can appear in the join table for one or more boards. |
+
+Note: `profiles` is not a standalone user table — it extends Supabase's built-in `auth.users` table (same `id`, one-to-one), adding app-specific fields like name and avatar. Authentication itself (including Google OAuth) is handled entirely by Supabase Auth; `profiles` just stores the extra data your app needs about each authenticated user.
+
+Note: a board's total calories/macros are **not stored** — they're computed at read-time by summing the macros of all meals linked to it via `board_meals`. This avoids stale totals if a meal is edited or removed from a board.
+</file>
+
+<file path="app/components/MealCard.module.css">
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.card {
+  background: #e6e0d2;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  padding: 14px;
+  display: flex;
+  gap: 16px;
+  width: 560px;
+  cursor: pointer;
+}
+
+.left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 0 8px 8px;
+}
+
+/* dish name sits on top, then calories, then macros */
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 4px;
+}
+.calories {
+  font-size: 15px;
+  font-weight: 600;
+}
+.macros {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--color-text);
+}
+
+/* editable title row (Saved Meals) */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.titleRow .title {
+  margin-bottom: 0;
+}
+.untitled {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+.editBtn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: grid;
+  place-items: center;
+}
+.editBtn:hover {
+  color: var(--color-text);
+}
+.titleInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border: 1px solid var(--color-text);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.item {
+  font-size: 14px;
+  text-transform: capitalize;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.item:last-child {
+  border-bottom: none;
+}
+.more {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  padding-top: 4px;
+}
+
+/* white panel on the right with the round plate image */
+.imagePanel {
+  flex-shrink: 0;
+  width: 220px;
+  background: #ffffff;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+}
+.image,
+.placeholder {
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.placeholder {
+  background: #f0e1de;
+}
+
+/* bookmark beside the card, only visible on hover */
+.saveButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 6px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.row:hover .saveButton,
+.saveButton:focus-visible,
+.savedState {
+  opacity: 1;
+}
+.saveButton:disabled {
+  cursor: default;
+}
+</file>
+
+<file path="app/saved-meals/page.tsx">
+import { supabase } from "@/lib/supabase";
+import { TEMP_USER_ID } from "@/lib/constants";
+import SavedMealCard from "../components/SavedMealCard";
+import styles from "../page.module.css";
+import boardStyles from "../components/Boards.module.css";
+
+export default async function SavedMealsPage() {
+  const { data: meals, error } = await supabase
+    .from("meals")
+    .select("*, meal_items(*), board_meals(board_id)")
+    .eq("user_id", TEMP_USER_ID)
+    .order("created_at", { ascending: false });
+
+  // The user's boards, so each card's modal can list them.
+  const { data: boards } = await supabase
+    .from("boards")
+    .select("id, name")
+    .eq("user_id", TEMP_USER_ID)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return <p>Failed to load saved meals: {error.message}</p>;
+  }
+
+  if (!meals || meals.length === 0) {
+    return (
+      <p>No saved meals yet — generate one on the Home page and hit Save.</p>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className={boardStyles.pageTitle}>Saved Meals</h1>
+      <div className={styles.grid}>
+        {meals.map((meal) => (
+          <SavedMealCard key={meal.id} meal={meal} boards={boards ?? []} />
+        ))}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="app/globals.css">
+:root {
+  /* Round The Hours palette, reused for Prep */
+  --color-bg: #f3eee3; /* warm beige page */
+  --color-surface: #faf6ee; /* cream cards / panels */
+  --color-accent: #2d4a3a; /* primary dark green button */
+  --color-accent-hover: #223a2d;
+  --color-sidebar: #223a2d; /* dark green sidebar */
+  --color-sidebar-active: #31503f;
+  --color-sidebar-text: #d9e2dc;
+  --color-highlight: #e8c75a; /* yellow marker / tag */
+  --color-danger: #c8402a; /* red-orange button / error */
+  --color-avatar: #f4a261;
+  --color-text: #1f2a24;
+  --color-text-muted: #6b6b60;
+  --color-border: #d9d2c3;
+  --color-tag-green: #dbe5da;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+button,
+input {
+  font-family: inherit;
+}
+</file>
+
+<file path="app/layout.tsx">
+import type { Metadata } from "next";
+import { Inter, Lobster } from "next/font/google";
+import "./globals.css";
+import styles from "./layout.module.css";
+import Sidebar from "./components/Sidebar";
+import TopBar from "./components/TopBar";
+import { Suspense } from "react";
+
+
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const lobster = Lobster({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-logo",
+});
+
+export const metadata: Metadata = {
+  title: "Meal Prep Generator",
+  description: "Generate meal plans to hit your calorie and macro targets.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className={`${inter.className} ${lobster.variable}`}>
+        <div className={styles.shell}>
+          <Sidebar />
+          <div className={styles.main}>
+            <Suspense fallback={null}>
+              <TopBar />
+            </Suspense>
+            <div className={styles.content}>{children}</div>
+          </div>
+        </div>
+      </body>
+    </html>
+  );
+}
+</file>
+
+<file path="app/components/SavedMealCard.tsx">
+"use client";
+
+import { useState } from "react";
+import styles from "./MealCard.module.css";
+import AddToBoardButton from "./AddToBoardButton";
+import MealDetailModal from "./MealDetailModal";
+
+type MealItem = { food_name: string; grams: number };
+type Meal = {
+  id: string;
+  name: string | null;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  image_url: string | null;
+  meal_items: MealItem[];
+  board_meals?: { board_id: string }[];
+};
+
+export default function SavedMealCard({
+  meal,
+  boards,
+}: {
+  meal: Meal;
+  boards?: { id: string; name: string }[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [name, setName] = useState<string>(meal.name ?? "");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const memberOf = (meal.board_meals ?? []).map((bm) => bm.board_id);
+
+  async function saveName() {
+    const next = draft.trim();
+    setEditing(false);
+    if (!next || next === name) return; // empty or unchanged: keep the old name
+    const res = await fetch(`/api/meals/${meal.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: next }),
+    });
+    if (res.ok) setName(next);
+  }
+
+  return (
+    <>
+      <div className={styles.card} onClick={() => setExpanded(true)}>
+        <div className={styles.left}>
+          <div>
+            {/* stopPropagation: editing the name shouldn't open the detail view */}
+            <div className={styles.titleRow} onClick={(e) => e.stopPropagation()}>
+              {editing ? (
+                <input
+                  autoFocus
+                  className={styles.titleInput}
+                  value={draft}
+                  maxLength={80}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={saveName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveName();
+                    if (e.key === "Escape") setEditing(false);
+                  }}
+                />
+              ) : (
+                <>
+                  <span
+                    className={`${styles.title} ${name ? "" : styles.untitled}`}
+                  >
+                    {name || "Untitled meal"}
+                  </span>
+                  <button
+                    className={styles.editBtn}
+                    aria-label="Rename meal"
+                    onClick={() => {
+                      setDraft(name);
+                      setEditing(true);
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
+            <div className={styles.calories}>
+              {Math.round(meal.calories)} kcal
+            </div>
+            <div className={styles.macros}>
+              <span>P {Math.round(meal.protein)}g</span>
+              <span>F {Math.round(meal.fat)}g</span>
+              <span>C {Math.round(meal.carbs)}g</span>
+            </div>
+          </div>
+
+          <ul className={styles.list}>
+            {meal.meal_items.slice(0, 4).map((item, i) => (
+              <li key={i} className={styles.item}>
+                {item.food_name}
+              </li>
+            ))}
+            {meal.meal_items.length > 4 && <li className={styles.more}>...</li>}
+          </ul>
+
+          {boards && (
+            // stopPropagation: clicking "Add to board" shouldn't also open the detail view
+            <div onClick={(e) => e.stopPropagation()}>
+              <AddToBoardButton
+                mealId={meal.id}
+                boards={boards}
+                memberOf={memberOf}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className={styles.imagePanel}>
+          {meal.image_url ? (
+            <img src={meal.image_url} alt={name || "Saved meal"} className={styles.image} />
+          ) : (
+            <div className={styles.placeholder} />
+          )}
+        </div>
+      </div>
+
+      {expanded && (
+        <MealDetailModal
+          meal={{
+            name,
+            items: meal.meal_items.map((i) => ({
+              food: i.food_name,
+              grams: i.grams,
+            })),
+            totals: {
+              calories: meal.calories,
+              protein: meal.protein,
+              fat: meal.fat,
+              carbs: meal.carbs,
+            },
+            imageUrl: meal.image_url,
+          }}
+          onClose={() => setExpanded(false)}
+        />
+      )}
+    </>
+  );
+}
+</file>
+
+<file path="app/page.module.css">
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.input {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  width: 140px;
+}
+.generateButton {
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  padding: 11px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.generateButton:hover {
+  background: var(--color-accent-hover);
+}
+.generateButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.scrollArea {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.searchInput {
+  flex: 1;
+  max-width: 480px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 11px 18px;
+  font-size: 14px;
+  background: var(--color-surface);
+}
+.searchInput:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-top: 24px;
+  font-style: italic;
+}
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 5px dotted var(--color-text);
+  border-radius: 50%;
+  animation: spin 1.2s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "meal-rec",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@google/genai": "^2.23.0",
+    "@supabase/supabase-js": "^2.116.0",
+    "next": "16.3.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+</file>
+
+<file path="app/components/MealCard.tsx">
+"use client";
+
+import { useState } from "react";
+import styles from "./MealCard.module.css";
+import { TEMP_USER_ID } from "@/lib/constants";
+import { supabase } from "@/lib/supabase";
+import MealDetailModal from "./MealDetailModal";
+import AddToBoardModal from "./AddToBoardModal";
+
+type Ingredient = {
+  food: string;
+  grams: number;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+};
+type Meal = {
+  name?: string;
+  cuisine?: string;
+  items: Ingredient[];
+  totals: { calories: number; protein: number; fat: number; carbs: number };
+  imageUrl?: string | null;
+};
+
+export default function MealCard({ meal }: { meal: Meal }) {
+  const [savedMealId, setSavedMealId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [boards, setBoards] = useState<{ id: string; name: string }[] | null>(
+    null,
+  ); // not null = "Choose board" modal is open
+
+  const previewItems = meal.items.slice(0, 4);
+  const hasMore = meal.items.length > 4;
+
+  async function openBoardPicker() {
+    const { data } = await supabase
+      .from("boards")
+      .select("id, name")
+      .eq("user_id", TEMP_USER_ID)
+      .order("created_at", { ascending: false });
+    setBoards(data ?? []);
+  }
+
+  // First click: save the meal, then open the "Choose board" modal.
+  // Later clicks: the meal is already saved, so just reopen the modal (no duplicate rows).
+  async function handleSave(e: React.MouseEvent) {
+    e.stopPropagation(); // don't also trigger the card's expand click
+
+    if (savedMealId) {
+      await openBoardPicker();
+      return;
+    }
+
+    setSaving(true);
+    const res = await fetch("/api/meals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: TEMP_USER_ID,
+        name: meal.name ?? null,
+        ingredients: meal.items,
+        totals: meal.totals,
+        imageUrl: meal.imageUrl ?? null,
+      }),
+    });
+
+    if (res.ok) {
+      const { mealId } = await res.json();
+      setSavedMealId(mealId);
+      await openBoardPicker();
+    }
+    setSaving(false);
+  }
+
+  return (
+    <>
+      <div className={styles.row}>
+        <div className={styles.card} onClick={() => setExpanded(true)}>
+          <div className={styles.left}>
+            <div>
+              <div className={styles.title}>{meal.name ?? "Meal"}</div>
+              <div className={styles.calories}>
+                {Math.round(meal.totals.calories)} kcal
+              </div>
+              <div className={styles.macros}>
+                <span>P {Math.round(meal.totals.protein)}g</span>
+                <span>F {Math.round(meal.totals.fat)}g</span>
+                <span>C {Math.round(meal.totals.carbs)}g</span>
+              </div>
+            </div>
+
+            <ul className={styles.list}>
+              {previewItems.map((item) => (
+                <li key={item.food} className={styles.item}>
+                  {item.food}
+                </li>
+              ))}
+              {hasMore && <li className={styles.more}>...</li>}
+            </ul>
+          </div>
+
+          <div className={styles.imagePanel}>
+            {meal.imageUrl ? (
+              <img
+                src={meal.imageUrl}
+                alt={meal.name ?? meal.cuisine ?? "Meal"}
+                className={styles.image}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/placeholder-meal.png"; // add a simple placeholder image to /public
+                }}
+              />
+            ) : (
+              <div className={styles.placeholder} />
+            )}
+          </div>
+        </div>
+
+        <button
+          className={`${styles.saveButton} ${savedMealId ? styles.savedState : ""}`}
+          onClick={handleSave}
+          disabled={saving}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 3h12v18l-6-4-6 4z" />
+          </svg>
+          {saving
+            ? "Saving…"
+            : savedMealId
+              ? "Saved · Add to board"
+              : "Save meal plan"}
+        </button>
+      </div>
+
+      {expanded && (
+        <MealDetailModal
+          meal={meal}
+          onClose={() => setExpanded(false)}
+          onSave={handleSave}
+          saved={!!savedMealId}
+          saving={saving}
+        />
+      )}
+
+      {boards && savedMealId && (
+        <AddToBoardModal
+          mealId={savedMealId}
+          boards={boards}
+          memberOf={[]}
+          onClose={() => setBoards(null)}
+        />
+      )}
+    </>
+  );
+}
+</file>
+
+<file path="app/page.tsx">
+"use client";
+
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import MealCard from "./components/MealCard";
+import styles from "./page.module.css";
+
+type Ingredient = {
+  food: string;
+  grams: number;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+};
+type Meal = {
+  name?: string;
+  cuisine?: string;
+  items: Ingredient[];
+  totals: { calories: number; protein: number; fat: number; carbs: number };
+  imageUrl?: string | null;
+};
+
+// Preloads one image URL and resolves once it's loaded (or failed) — used to serialize image
+// requests one at a time, since Pollinations' free tier only allows 1 in-flight request per IP.
+function preloadImage(url: string) {
+  return new Promise<void>((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    img.src = url;
+  });
+}
+
+// Your product defaults from the functional requirements — applied here in code,
+// not trusted to the AI, so they're guaranteed consistent every time.
+const DEFAULT_CALORIE_TARGET = 2000;
+const DEFAULT_PROTEIN = 30;
+const DEFAULT_FAT = 25;
+const DEFAULT_CARBS = 45;
+
+function HomeInner() {
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // The search bar lives in the TopBar, which puts the query in the URL (?q=...).
+  const searchParams = useSearchParams();
+  const q = searchParams.get("q");
+  const key = searchParams.toString();
+  const lastKey = useRef<string | null>(null); // stops dev StrictMode running the search twice
+
+  useEffect(() => {
+    if (!q || lastKey.current === key) return;
+    lastKey.current = key;
+    handleGenerate(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  async function handleGenerate(query: string) {
+    setLoading(true);
+    setMeals([]);
+
+    // Step 1 — understand what the user typed
+    const parseRes = await fetch("/api/parse-query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    const parsed = await parseRes.json();
+
+    // Step 2 — fill in anything the user didn't specify, with OUR defaults, not AI's guess
+    const resolved = {
+      calorieTarget: parsed.calorieTarget ?? DEFAULT_CALORIE_TARGET,
+      protein: parsed.proteinPercent ?? DEFAULT_PROTEIN,
+      fat: parsed.fatPercent ?? DEFAULT_FAT,
+      carbs: parsed.carbPercent ?? DEFAULT_CARBS,
+      cuisinePreference: parsed.cuisinePreference ?? null,
+    };
+
+    // Step 3 — generate, exactly as before, just with resolved values instead of raw form inputs
+    const res = await fetch("/api/generate-meal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(resolved),
+    });
+
+    const data = await res.json();
+
+    for (const meal of data.meals ?? []) {
+      if (meal.imageUrl) await preloadImage(meal.imageUrl);
+      setMeals((prev) => [...prev, meal]);
+    }
+
+    setLoading(false);
+  }
+
+  return (
+    <div>
+      {loading && meals.length === 0 && (
+        <div className={styles.loading}>
+          <div className={styles.spinner} />
+          <p>Generating meals</p>
+        </div>
+      )}
+
+      <div className={styles.scrollArea}>
+        {meals.map((meal, i) => (
+          <MealCard key={i} meal={meal} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeInner />
+    </Suspense>
+  );
+}
+</file>
+
+<file path="app/api/generate-meal/route.ts">
+import { GoogleGenAI } from "@google/genai";
+import { NextResponse } from "next/server";
+
+// This creates one "client" object, authenticated with your API key. basically just another layer of abstraction
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+// Dev/cost switch from .env.local. Image generation is OFF unless explicitly set to "true",
+// which keeps the main meal flow fast and free of image-provider failures while testing.
+const IMAGES_ENABLED = process.env.ENABLE_IMAGE_GENERATION === "true";
+
+
+const SYSTEM_PROMPT = `You are an expert chef and meal-prep planner. Given a calorie target and macro split, generate exactly 3 distinct full meals.
+
+Rules:
+- Every meal must be a REAL, existing dish from a specific cuisine that people already know and order (e.g. Chicken Teriyaki Rice Bowl, Butter Chicken with Basmati Rice, Bibimbap, Chicken Burrito Bowl, Greek Chicken Gyro Plate, Grilled Salmon with Roasted Vegetables). Start from the authentic dish, then SIMPLIFY it — fewer ingredients, lean proteins, lighter cooking methods, sensible portions — so it fits the calorie and macro target. Never invent a dish by just combining foods to hit macros.
+- Every ingredient must belong in that dish. Use the ingredients, sauces and seasonings the dish is actually known for (e.g. teriyaki sauce in a teriyaki bowl, not olive oil and salsa). No random extras. Use 4 to 7 ingredients per meal.
+- Vary the cuisine across the 3 meals (e.g. one Asian, one Western, one Indian or Mexican) so the user gets real variety. If the user asks for one cuisine, give 3 different dishes from that cuisine.
+- "name": a short, appetizing dish name of 2 to 5 words, with no calorie numbers and no quotes (e.g. "Teriyaki Chicken Rice Bowl").
+- "cuisine": the single cuisine the dish comes from (e.g. "Japanese").
+- Only suggest whole, generic, realistic foods (no branded products).
+- If a sauce, dressing, or oil is used, include it as its own ingredient with realistic quantities and its own macros.
+- For each food, estimate a realistic portion size in grams and its calories, protein, fat, and carbs for that portion, based on typical nutritional values. Keep each food's calories consistent with its macros (about 4 per gram of protein, 4 per gram of carbs, 9 per gram of fat).
+- The sum of the foods should roughly hit the calorie and macro target given.
+- Return ONLY valid JSON, no other text, in this exact shape:
+{
+  "meals": [
+    {
+      "name": "Teriyaki Chicken Rice Bowl",
+      "cuisine": "Japanese",
+      "items": [
+        { "food": "ingredient name", "grams": 000, "calories": 000, "protein": 00, "fat": 00, "carbs": 00 }
+      ]
+    }
+  ]
+}`;
+
+// Words/foods to explicitly exclude from the generated plate image (fights the "plastic AI food" look)
+const NEGATIVE_PROMPT =
+  "sauce, gravy, dollop, cream, mousse, blended, pudding, mixed together, garnish, mash, plastic texture, waxy, glossy shine, 3d render, cgi, illustration, cartoon, artificial";
+
+// Gives each visible ingredient an explicit clock-position on the plate instead of a vague "arranged separately" —
+// concrete positions genuinely produce cleaner, more separated results than a generic adjective would.
+const CLOCK_POSITIONS: Record<number, string[]> = {
+  1: ["at the center"],
+  2: ["at 9 o'clock", "at 3 o'clock"],
+  3: ["at 12 o'clock", "at 4 o'clock", "at 8 o'clock"],
+  4: ["at 12 o'clock", "at 3 o'clock", "at 6 o'clock", "at 9 o'clock"],
+};
+
+// Strips database-style qualifiers that mean nothing visually (nutrition states, percentages,
+// parenthetical notes) so the image model gets a clean, natural food description instead of
+// raw nutrition-label text like "Pasta, Dry" or "Lean Ground Beef (90% Lean)".
+function sanitizeForImagePrompt(foodName: string): string {
+  return foodName
+    .replace(/\([^)]*\)/g, "") // remove anything in parentheses, e.g. "(90% Lean)"
+    .replace(/,?\s*(dry weight|dry|raw|canned|uncooked)\b/gi, "") // remove state words that don't describe the cooked dish
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+// Filters a meal's ingredients down to only what should actually be drawn on the plate —
+// oils/vinegars are invisible in a photo, sauces get folded into a descriptor instead of shown as a separate item,
+// and anything under 15g is too small to render meaningfully.
+function pickVisibleIngredients(items: { food: string; grams: number }[]) {
+  const visible: string[] = [];
+  let sauceDescriptor = "";
+
+  for (const item of items) {
+    const name = item.food.toLowerCase();
+    if (name.includes("oil") || name.includes("vinegar")) continue;
+    if (
+      name.includes("sauce") ||
+      name.includes("dressing") ||
+      name.includes("glaze")
+    ) {
+      sauceDescriptor = `lightly glazed with ${sanitizeForImagePrompt(item.food)}`;
+      continue;
+    }
+    if (item.grams < 15) continue;
+    visible.push(sanitizeForImagePrompt(item.food));
+  }
+
+  return { visible, sauceDescriptor };
+}
+
+// Builds the actual text prompt sent to the image model, based on one meal's visible ingredients.
+// Explicitly says the foods are DIFFERENT, because a vague "separate portions" tends to produce
+// N identical servings of one dish (stock-photo grid pattern) instead of N distinct foods.
+function buildImagePrompt(items: { food: string; grams: number }[]) {
+  const { visible, sauceDescriptor } = pickVisibleIngredients(items);
+  const count = Math.min(visible.length, 4) || 1;
+  const positions = CLOCK_POSITIONS[count];
+
+  const layout = visible
+    .slice(0, 4)
+    .map((food, i) => `${positions[i]}: ${food}`)
+    .join(", ");
+
+  const sauceText = sauceDescriptor ? `, ${sauceDescriptor}` : "";
+
+  return `Food photography, high 45-degree angle, one single plate showing ${count} DIFFERENT foods side by side (not ${count} servings of the same food): ${layout}${sauceText}. Each food item is visually distinct from the others in shape, color and texture. Natural matte texture, visible grill char marks where relevant, shot on DSLR, soft diffused daylight, shallow depth of field, realistic, appetizing, plain background, no extra garnish, no text, no utensils`;
+}
+
+// Turns a text prompt into a real Pollinations image URL. No API key needed — the URL itself IS the generated image;
+// the browser triggers the actual generation the moment an <img> tag tries to load this URL.
+function buildImageUrl(prompt: string) {
+  const params = new URLSearchParams({
+    model: "flux",
+    width: "512",
+    height: "512",
+    nologo: "true",
+    enhance: "false", // stops Pollinations' own LLM from silently rewriting/embellishing our prompt
+    private: "true",
+    negative_prompt: NEGATIVE_PROMPT, // was "negative" — wrong key, was being ignored entirely
+    seed: String(Math.floor(Math.random() * 1_000_000)), // different image each generation, not a repeat
+  });
+
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params.toString()}`;
+}
+
+//conventiaonl set style to write like this
+export async function POST(req: Request) {
+  const { calorieTarget, protein, fat, carbs, cuisinePreference } =
+    await req.json();
+
+  //Builds the actual question to ask Gemini, using the values the user sent in.
+  // const userPrompt = `Generate 3 meals, each roughly ${calorieTarget} calories, targeting ${protein}% protein, ${fat}% fat, ${carbs}% carbs.`;
+
+  // Update userPrompt construction to include it when present:
+  const userPrompt = cuisinePreference
+    ? `Generate 3 meals, each roughly ${calorieTarget} calories, targeting ${protein}% protein, ${fat}% fat, ${carbs}% carbs, all in the ${cuisinePreference} cuisine style.`
+    : `Generate 3 meals, each roughly ${calorieTarget} calories, targeting ${protein}% protein, ${fat}% fat, ${carbs}% carbs.`;
+
+  //'await' makes it synchronous, pauses this line until Promise resovles,  if just plain 'model.generateContent' it will generate a promise instead of the result,
+  // 'await' makes the code pause and wait for the actual repsonse before proceeding to next line
+  // the network call is still async under the hood, we're just waiting for its result before continuing.
+  // await is only allowed to appear inside a function marked async — that's a hard JavaScript rule, not optional styling.
+  // wrapped in try/catch now — if Gemini throws (rate limit, outage, etc.), we return a real JSON error
+  // instead of an empty response body that would crash the frontend's res.json() call.
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model: "gemini-3.5-flash-lite",
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: SYSTEM_PROMPT + "\n\n" + userPrompt }],
+        },
+      ],
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: "AI generation failed", detail: err.message ?? String(err) },
+      { status: 502 },
+    );
+  }
+
+  //   Gemini's raw response is a more complex object; .text() extracts just the plain text content out of it —
+  //    which, in your case, should be that JSON string you asked for
+  const text = response.text;
+
+  //Check for undefined before parsing.
+  if (!text) {
+    return NextResponse.json(
+      { error: "Gemini returned no text" },
+      { status: 500 },
+    );
+  }
+
+  //just to check if AI followed the structure
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return NextResponse.json(
+      { error: "Gemini returned invalid JSON", raw: text },
+      { status: 500 },
+    );
+  }
+
+  // For each of Gemini's 3 meals, generate a matching plate image URL from its own ingredient list
+  // (only when the toggle is on; otherwise imageUrl is null and the UI shows the placeholder).
+    // Totals are summed from the ingredient list here in code, not trusted from the AI,
+  // so a meal's headline numbers always match the ingredients shown under it.
+  // For each of Gemini's 3 meals, also generate a matching plate image URL
+  // (only when the toggle is on; otherwise imageUrl is null and the UI shows the placeholder).
+  const meals = (parsed.meals ?? []).map((meal: any) => {
+    const totals = (meal.items ?? []).reduce(
+      (t: any, i: any) => ({
+        calories: t.calories + Number(i.calories ?? 0),
+        protein: t.protein + Number(i.protein ?? 0),
+        fat: t.fat + Number(i.fat ?? 0),
+        carbs: t.carbs + Number(i.carbs ?? 0),
+      }),
+      { calories: 0, protein: 0, fat: 0, carbs: 0 },
+    );
+    return {
+      ...meal,
+      totals,
+      imageUrl: IMAGES_ENABLED
+        ? buildImageUrl(buildImagePrompt(meal.items))
+        : null,
+    };
+  });
+
+  return NextResponse.json({ meals });
+}
+</file>
+
+</files>

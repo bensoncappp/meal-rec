@@ -8,10 +8,10 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 // which keeps the main meal flow fast and free of image-provider failures while testing.
 const IMAGES_ENABLED = process.env.ENABLE_IMAGE_GENERATION === "true";
 
-
 const SYSTEM_PROMPT = `You are an expert chef and meal-prep planner. Given a calorie target and macro split, generate exactly 3 distinct full meals.
 
 Rules:
+- THE USER'S REQUEST COMES FIRST. If the request names specific foods, ingredients or dishes, every one of the 3 meals MUST prominently feature them (as the main protein or the star of the dish) — never ignore or merely garnish them. If it names an ingredient (e.g. prawn), give 3 different dishes built around it. If it names a specific dish (e.g. pad thai), give 3 variations of that dish (e.g. different proteins or styles). Also respect any stated preferences or restrictions (spicy, vegetarian, no dairy, etc.) in every meal.
 - Every meal must be a REAL, existing dish from a specific cuisine that people already know and order (e.g. Chicken Teriyaki Rice Bowl, Butter Chicken with Basmati Rice, Bibimbap, Chicken Burrito Bowl, Greek Chicken Gyro Plate, Grilled Salmon with Roasted Vegetables). Start from the authentic dish, then SIMPLIFY it — fewer ingredients, lean proteins, lighter cooking methods, sensible portions — so it fits the calorie and macro target. Never invent a dish by just combining foods to hit macros.
 - Every ingredient must belong in that dish. Use the ingredients, sauces and seasonings the dish is actually known for (e.g. teriyaki sauce in a teriyaki bowl, not olive oil and salsa). No random extras. Use 4 to 7 ingredients per meal.
 - Vary the cuisine across the 3 meals (e.g. one Asian, one Western, one Indian or Mexican) so the user gets real variety. If the user asks for one cuisine, give 3 different dishes from that cuisine.
@@ -120,16 +120,36 @@ function buildImageUrl(prompt: string) {
 
 //conventiaonl set style to write like this
 export async function POST(req: Request) {
-  const { calorieTarget, protein, fat, carbs, cuisinePreference } =
-    await req.json();
+  const {
+    calorieTarget,
+    protein,
+    fat,
+    carbs,
+    cuisinePreference,
+    mustInclude,
+    notes,
+  } = await req.json();
 
   //Builds the actual question to ask Gemini, using the values the user sent in.
-  // const userPrompt = `Generate 3 meals, each roughly ${calorieTarget} calories, targeting ${protein}% protein, ${fat}% fat, ${carbs}% carbs.`;
-
-  // Update userPrompt construction to include it when present:
-  const userPrompt = cuisinePreference
-    ? `Generate 3 meals, each roughly ${calorieTarget} calories, targeting ${protein}% protein, ${fat}% fat, ${carbs}% carbs, all in the ${cuisinePreference} cuisine style.`
-    : `Generate 3 meals, each roughly ${calorieTarget} calories, targeting ${protein}% protein, ${fat}% fat, ${carbs}% carbs.`;
+  // Each extra line is only added when the user actually asked for it, so a plain
+  // "2000 calories" request still behaves exactly as before.
+  const promptLines = [
+    `Generate 3 meals, each roughly ${calorieTarget} calories, targeting ${protein}% protein, ${fat}% fat, ${carbs}% carbs.`,
+  ];
+  if (cuisinePreference) {
+    promptLines.push(
+      `All 3 meals must be in the ${cuisinePreference} cuisine style (3 different dishes).`,
+    );
+  }
+  if (Array.isArray(mustInclude) && mustInclude.length > 0) {
+    promptLines.push(
+      `The user specifically asked for: ${mustInclude.join(", ")}. Every one of the 3 meals MUST prominently feature this — it should be the main protein or the star of the dish, not a side or garnish.`,
+    );
+  }
+  if (notes) {
+    promptLines.push(`Also respect these preferences in every meal: ${notes}.`);
+  }
+  const userPrompt = promptLines.join("\n");
 
   //'await' makes it synchronous, pauses this line until Promise resovles,  if just plain 'model.generateContent' it will generate a promise instead of the result,
   // 'await' makes the code pause and wait for the actual repsonse before proceeding to next line
@@ -147,6 +167,7 @@ export async function POST(req: Request) {
           parts: [{ text: SYSTEM_PROMPT + "\n\n" + userPrompt }],
         },
       ],
+      config: { responseMimeType: "application/json" }, // ask Gemini for raw JSON, no markdown fences
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -178,9 +199,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // For each of Gemini's 3 meals, generate a matching plate image URL from its own ingredient list
-  // (only when the toggle is on; otherwise imageUrl is null and the UI shows the placeholder).
-    // Totals are summed from the ingredient list here in code, not trusted from the AI,
+  // Totals are summed from the ingredient list here in code, not trusted from the AI,
   // so a meal's headline numbers always match the ingredients shown under it.
   // For each of Gemini's 3 meals, also generate a matching plate image URL
   // (only when the toggle is on; otherwise imageUrl is null and the UI shows the placeholder).
